@@ -10,7 +10,8 @@
     "build": "npm --workspace server run build && npm --workspace client run build",
     "db:generate": "npm --workspace server run db:generate",
     "db:migrate": "npm --workspace server run db:migrate",
-    "db:seed": "npm --workspace server run db:seed"
+    "db:seed": "npm --workspace server run db:seed",
+    "test": "npm --workspace server run test"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

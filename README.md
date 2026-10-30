@@ -2,9 +2,26 @@
 
 KitchenSync is a responsive household kitchen assistant that keeps meal plans, pantry stock, shopping, and real consumption connected. The Phase 1 flow is **Plan → Allocate → Detect shortage → Shop → Cook → Deduct → Verify**.
 
-## Current milestone
+## Current status
 
-The initial foundation is in place: a React/Vite client shell, Express API, PostgreSQL/Prisma data model, database backed sessions, registration/login/logout, household creation, household membership checks, and a dashboard backed by database queries. Pantry, recipes, meal allocations, cooking, shopping workflows, and AI are staged for later milestones.
+| Milestone | Status |
+| --- | --- |
+| 1. Foundation: auth, households, sessions, dashboard shell | Done |
+| 2. Pantry: inventory CRUD, units, confidence, stock checks, history | Done |
+| 3. Recipes and Indian recipe seed data | Next |
+| 4–9. Planner, allocation and shortages, cooking, shopping, verification queue, AI assistant | Planned |
+
+Navigation entries for unbuilt modules open an honest "coming soon" page.
+
+### Pantry (Milestone 2)
+
+- Add, edit, delete, search, category filters and views (low stock, needs check, expiring).
+- Quantities are stored as PostgreSQL `numeric` in each ingredient's canonical unit (`g`, `ml` or `count`). Input accepts g/kg, ml/L or pcs. Conversions across families (for example ml of rice) are rejected.
+- Stock confidence: Confirmed, Estimated or Check needed. A stock check ("Quantity is correct", "Update quantity", "Mark as finished") always sets Confirmed and records an `InventoryVerification`.
+- Low-stock alerts per item, purchase/expiry dates, last-verified time and stock source.
+- Every quantity change writes an append-only `StockTransaction` with the balance after the change. History is kept after an item is deleted.
+- Mutations lock the pantry row (`SELECT … FOR UPDATE`) inside a transaction, so concurrent edits from household members cannot drive stock negative.
+- Households can add custom ingredients; they are private to that household.
 
 ## Requirements
 
@@ -24,8 +41,17 @@ The initial foundation is in place: a React/Vite client shell, Express API, Post
 4. Apply the committed migrations (this also generates Prisma Client) with `npm run db:migrate`.
 5. Seed the canonical ingredient catalog with `npm run db:seed`.
 6. Start client and API with `npm run dev`.
+7. Optional: run the test suite with `npm test` (see below).
 
 The UI is at `http://localhost:5173`; the API health endpoint is `http://localhost:4000/api/v1/health`. AI configuration is optional; `AI_API_KEY` is not used until the assistant milestone.
+
+## Tests
+
+`npm test` runs unit tests (unit conversion, stock status) and API integration tests (pantry CRUD, decimal precision, concurrent usage, verification, history, household isolation) against a real PostgreSQL database.
+
+1. Create a second database, e.g. `CREATE DATABASE kitchensync_test OWNER kitchensync;`
+2. Set `TEST_DATABASE_URL` in `server/.env`. Its name must contain `test`; the runner refuses anything else.
+3. `npm test` applies migrations and the seed to that database, then runs the tests. Tests create uniquely named users, so the database never needs wiping.
 
 ## Environment variables
 
@@ -37,13 +63,18 @@ The UI is at `http://localhost:5173`; the API health endpoint is `http://localho
 | `DATABASE_URL` | Yes | PostgreSQL connection used by Prisma and session store |
 | `SESSION_SECRET` | Yes | Secret used to sign secure session identifiers |
 | `AI_API_KEY` | No | Reserved for the later server-side assistant integration |
+| `TEST_DATABASE_URL` | For tests | Separate database used by `npm test` |
 
 ## Project layout
 
 ```text
 client/              React + Vite user interface
-server/src/           Express routes, middleware, configuration and services
-server/prisma/        PostgreSQL schema and seed script
+client/src/features/  One folder per product area (auth, household, dashboard, pantry)
+client/src/components/ Shared UI: app shell, modal, badges, empty/loading/error states
+server/src/routes/    Express routers: validation and HTTP only
+server/src/services/  Domain logic: pantry mutations, unit conversion
+server/scripts/       Test runner
+server/prisma/        PostgreSQL schema, migrations and seed script
 ARCHITECTURE.md       Domain model, API plan, screens, risks and roadmap
 ```
 

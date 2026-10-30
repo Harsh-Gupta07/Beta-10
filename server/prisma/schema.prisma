@@ -40,16 +40,27 @@ enum MealStatus {
 }
 
 enum StockTransactionType {
+  INITIAL_STOCK
   PURCHASE_RECEIVED
   COOKING_CONSUMPTION
   CORRECTION
   MANUAL_USE
+  REMOVED
 }
 
 enum ShoppingItemStatus {
   NEEDED
   PURCHASED
   RECEIVED
+}
+
+/// express-session storage used by connect-pg-simple. Declared here so migrations own it.
+model Session {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+  @@index([expire], map: "IDX_session_expire")
+  @@map("session")
 }
 
 model User {
@@ -71,6 +82,7 @@ model Household {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   members          HouseholdMember[]
+  ingredients      Ingredient[]
   pantryItems      PantryItem[]
   recipes          Recipe[]
   mealPlans        MealPlan[]
@@ -92,15 +104,24 @@ model HouseholdMember {
   @@index([userId])
 }
 
+/// Global catalog entries have householdId = null; custom entries belong to one household.
+/// nameKey is the trimmed, lower-cased name used for duplicate detection.
 model Ingredient {
   id             String               @id @default(cuid())
-  name           String               @unique
+  householdId    String?
+  name           String
+  nameKey        String
   category       String               @default("Other")
+  /// One of g, ml, count. Pantry and recipe quantities are stored in this unit.
   canonicalUnit  String
+  household      Household?           @relation(fields: [householdId], references: [id], onDelete: Cascade)
   pantryItems    PantryItem[]
   recipeLines    RecipeIngredient[]
   allocations    MealIngredientAllocation[]
   shoppingItems  ShoppingListItem[]
+  stockTransactions StockTransaction[]
+  @@unique([householdId, nameKey])
+  @@index([nameKey])
 }
 
 model PantryItem {
@@ -109,11 +130,13 @@ model PantryItem {
   ingredientId      String
   quantity          Decimal         @db.Decimal(12, 3)
   unit              String
+  lowStockThreshold Decimal?        @db.Decimal(12, 3)
   confidence        StockConfidence @default(ESTIMATED)
   source            StockSource     @default(MANUAL)
   purchasedAt       DateTime?
   expiresAt         DateTime?
   lastVerifiedAt    DateTime?
+  createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   household         Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
   ingredient        Ingredient      @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
@@ -205,16 +228,20 @@ model StockTransaction {
   id             String                @id @default(cuid())
   idempotencyKey String                @unique
   householdId    String
-  pantryItemId   String
+  /// Null once the pantry item is deleted; ingredientId keeps the history readable.
+  pantryItemId   String?
+  ingredientId   String
   actorUserId    String
   cookingEventId String?
   type           StockTransactionType
   delta          Decimal               @db.Decimal(12, 3)
+  balanceAfter   Decimal               @db.Decimal(12, 3)
   unit           String
   note           String                @default("")
   createdAt      DateTime              @default(now())
   household      Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  pantryItem     PantryItem            @relation(fields: [pantryItemId], references: [id], onDelete: Restrict)
+  pantryItem     PantryItem?           @relation(fields: [pantryItemId], references: [id], onDelete: SetNull)
+  ingredient     Ingredient            @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
   actor          User                  @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
   cookingEvent   CookingEvent?         @relation(fields: [cookingEventId], references: [id], onDelete: SetNull)
   @@index([householdId, createdAt])
@@ -250,7 +277,7 @@ model ShoppingListItem {
 model InventoryVerification {
   id          String      @id @default(cuid())
   householdId String
-  pantryItemId String
+  pantryItemId String?
   actorUserId String
   oldQuantity Decimal     @db.Decimal(12, 3)
   newQuantity Decimal     @db.Decimal(12, 3)
@@ -258,7 +285,7 @@ model InventoryVerification {
   note        String      @default("")
   verifiedAt  DateTime    @default(now())
   household   Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  pantryItem  PantryItem  @relation(fields: [pantryItemId], references: [id], onDelete: Restrict)
+  pantryItem  PantryItem? @relation(fields: [pantryItemId], references: [id], onDelete: SetNull)
   actor       User        @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
   @@index([householdId, verifiedAt])
 }

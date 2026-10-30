@@ -37,11 +37,11 @@ docs/ (product and implementation notes)
 - `User` has credentials and profile data.
 - `Household` owns household settings and shared operational data.
 - `HouseholdMember` joins users to households with a role; unique `(householdId,userId)` prevents duplicate membership.
-- `Ingredient` is a canonical ingredient catalog entry; `PantryItem` is a household's quantity, canonical unit, confidence/source, purchase/expiry/verification metadata. Unique `(householdId,ingredientId)` for the initial one-stock-record-per-ingredient model.
+- `Ingredient` is a catalog entry with a canonical unit (`g`, `ml`, `count`). Global entries have no household; custom entries belong to one household and are unique per household by lower-cased name (`nameKey`). `PantryItem` is a household's quantity, canonical unit, confidence/source, purchase/expiry/verification metadata. Unique `(householdId,ingredientId)` for the initial one-stock-record-per-ingredient model.
 - `Recipe` belongs to a household or is seeded as shared; `RecipeIngredient` references an ingredient and stores a decimal canonical quantity per base serving.
 - `MealPlan` groups a household and week; `PlannedMeal` records date, slot, recipe, servings, and status. Unique `(mealPlanId,date,slot)` prevents two active meals from occupying a slot.
 - `MealIngredientAllocation` records calculated requirement per planned meal and ingredient. It is derived/rebuilt by deterministic allocation services and never changes physical stock.
-- `CookingEvent` is unique per planned meal and idempotency key. `StockTransaction` is an append-only audit of purchase receipt, cooking consumption, correction, or other stock movement.
+- `CookingEvent` is unique per planned meal and idempotency key. `StockTransaction` is an append-only audit of every stock movement (initial stock, purchase receipt, cooking consumption, correction, manual use, removal) with `delta` and `balanceAfter`. It references the ingredient directly, so history survives pantry-item deletion (`pantryItemId` is set null).
 - `ShoppingList` belongs to a household; `ShoppingListItem` tracks ingredient, quantity, and purchase/receipt state. Marking purchased does not update pantry; only confirmed received quantity does.
 - `InventoryVerification` records checks/corrections and their actor/time. `Notification` can record resulting meal-impact notices.
 
@@ -51,7 +51,8 @@ All household-owned rows carry a household relationship (directly or through a p
 
 - Auth: `POST /api/v1/auth/register`, `/login`, `/logout`; `GET /auth/me`.
 - Household: `GET/POST /households`, `GET/PATCH /households/:id`, `POST /households/:id/invitations`, `GET /households/:id/members`.
-- Pantry: `GET/POST /households/:id/pantry`, `PATCH/DELETE /pantry/:itemId`, `POST /pantry/:itemId/verify`, `POST /pantry/:itemId/receive`.
+- Ingredients (implemented): `GET/POST /households/:id/ingredients`. Global catalog plus household-private custom ingredients.
+- Pantry (implemented): `GET/POST /households/:id/pantry`, `PATCH/DELETE /households/:id/pantry/:itemId`, `POST …/pantry/:itemId/use`, `POST …/pantry/:itemId/verify` (`confirm` | `update` | `finished`), `GET …/pantry/:itemId/transactions`. Item routes are nested under the household so the membership middleware guards every call; services also filter by `householdId`. Receiving purchases arrives with the shopping milestone.
 - Recipes: `GET/POST /households/:id/recipes`, `GET/PATCH/DELETE /recipes/:recipeId`.
 - Meal plans: `GET/POST /households/:id/meal-plans`, `POST /meal-plans/:id/meals`, `PATCH/DELETE /meals/:mealId`, `POST /meals/:mealId/start`, `POST /meals/:mealId/complete` with idempotency key.
 - Planning: `GET /households/:id/allocations`, `GET /households/:id/shortages`; recalculation is invoked by the mutation services.
