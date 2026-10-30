@@ -10,7 +10,8 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
 }
 
 export async function requireHouseholdMember(req: Request, res: Response, next: NextFunction) {
-  const householdId = req.params.householdId ?? req.params.id
+  const rawHouseholdId = req.params.householdId ?? req.params.id
+  const householdId = Array.isArray(rawHouseholdId) ? rawHouseholdId[0] : rawHouseholdId
   if (!householdId || !req.session.userId) return res.status(400).json({ error: 'A household is required.' })
   const membership = await prisma.householdMember.findUnique({ where: { householdId_userId: { householdId, userId: req.session.userId } } })
   if (!membership) return res.status(404).json({ error: 'Household not found.' })
