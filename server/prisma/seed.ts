@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { recipes } from './recipes.data.js'
 
 const prisma = new PrismaClient()
 
@@ -31,6 +32,25 @@ async function main() {
     }
   }
   console.log(`Seeded ${ingredients.length} canonical ingredients.`)
+
+  // Shared recipes are matched by name and refreshed in place so planned meals keep their recipe ids.
+  const catalog = new Map((await prisma.ingredient.findMany({ where: { householdId: null } })).map(i => [i.nameKey, i]))
+  for (const recipe of recipes) {
+    const lines = recipe.ingredients.map(([name, quantity, note], position) => {
+      const ingredient = catalog.get(name.toLowerCase())
+      if (!ingredient) throw new Error(`Recipe "${recipe.name}" uses unknown ingredient "${name}".`)
+      if (ingredient.canonicalUnit === 'count' && !Number.isInteger(quantity)) throw new Error(`Recipe "${recipe.name}": ${name} must be a whole number.`)
+      return { ingredientId: ingredient.id, quantity, unit: ingredient.canonicalUnit, note: note ?? '', position }
+    })
+    const data = { name: recipe.name, description: recipe.description, category: recipe.category, baseServings: recipe.baseServings, prepMinutes: recipe.prepMinutes, cookMinutes: recipe.cookMinutes, instructions: recipe.instructions, isShared: true }
+    const existing = await prisma.recipe.findFirst({ where: { householdId: null, name: recipe.name } })
+    await prisma.$transaction(async tx => {
+      const saved = existing ? await tx.recipe.update({ where: { id: existing.id }, data }) : await tx.recipe.create({ data })
+      await tx.recipeIngredient.deleteMany({ where: { recipeId: saved.id } })
+      await tx.recipeIngredient.createMany({ data: lines.map(line => ({ ...line, recipeId: saved.id })) })
+    })
+  }
+  console.log(`Seeded ${recipes.length} shared recipes.`)
 }
 
 main().finally(() => prisma.$disconnect())

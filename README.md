@@ -8,10 +8,20 @@ KitchenSync is a responsive household kitchen assistant that keeps meal plans, p
 | --- | --- |
 | 1. Foundation: auth, households, sessions, dashboard shell | Done |
 | 2. Pantry: inventory CRUD, units, confidence, stock checks, history | Done |
-| 3. Recipes and Indian recipe seed data | Next |
-| 4–9. Planner, allocation and shortages, cooking, shopping, verification queue, AI assistant | Planned |
+| 3. Recipes: library, custom recipes, serving scaling, 15 Indian recipes | Done |
+| 4. Weekly meal planner | Next |
+| 5–10. Allocation and shortages, cooking, shopping, verification queue, AI assistant | Planned |
 
 Navigation entries for unbuilt modules open an honest "coming soon" page.
+
+### Recipes (Milestone 3)
+
+- 15 shared Indian recipes (dal tadka, rajma chawal, poha, pulao, paneer bhurji, aloo paratha, khichdi, aloo gobi with roti, upma, chole, palak paneer, masoor dal, besan chilla, masala chai, egg bhurji), defined in `server/prisma/recipes.data.ts`.
+- Every ingredient line references a catalog ingredient and is stored in its canonical unit, so recipes and pantry stock are directly comparable.
+- Search, category filter and a "Ready to cook" filter. Each recipe shows which ingredients your pantry is short on at your usual servings. This is an on-hand comparison; reserving stock across planned meals belongs to the allocation engine.
+- Scale any recipe from 1 to 50 servings. Scaling uses decimal math; piece counts (eggs, lemons) round up.
+- Create, edit and delete your own recipes. Built-in recipes are read-only; "Make a copy to edit" creates a household copy.
+- A recipe used by planned meals cannot be deleted.
 
 ### Pantry (Milestone 2)
 
@@ -47,7 +57,7 @@ The UI is at `http://localhost:5173`; the API health endpoint is `http://localho
 
 ## Tests
 
-`npm test` runs unit tests (unit conversion, stock status) and API integration tests (pantry CRUD, decimal precision, concurrent usage, verification, history, household isolation) against a real PostgreSQL database.
+`npm test` runs unit tests (unit conversion, recipe scaling, stock status) and API integration tests (pantry CRUD, decimal precision, concurrent usage, verification, history, recipe scaling and pantry comparison, read-only built-in recipes, household isolation) against a real PostgreSQL database.
 
 1. Create a second database, e.g. `CREATE DATABASE kitchensync_test OWNER kitchensync;`
 2. Set `TEST_DATABASE_URL` in `server/.env`. Its name must contain `test`; the runner refuses anything else.
@@ -69,12 +79,12 @@ The UI is at `http://localhost:5173`; the API health endpoint is `http://localho
 
 ```text
 client/              React + Vite user interface
-client/src/features/  One folder per product area (auth, household, dashboard, pantry)
+client/src/features/  One folder per product area (auth, household, dashboard, pantry, recipes)
 client/src/components/ Shared UI: app shell, modal, badges, empty/loading/error states
 server/src/routes/    Express routers: validation and HTTP only
-server/src/services/  Domain logic: pantry mutations, unit conversion
+server/src/services/  Domain logic: pantry mutations, recipes, unit conversion and scaling
 server/scripts/       Test runner
-server/prisma/        PostgreSQL schema, migrations and seed script
+server/prisma/        PostgreSQL schema, migrations, seed script and recipe data
 ARCHITECTURE.md       Domain model, API plan, screens, risks and roadmap
 ```
 

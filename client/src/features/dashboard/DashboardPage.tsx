@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, CalendarDays, ClipboardCheck, PackageCheck, Plus, TriangleAlert } from 'lucide-react'
+import { Activity, BookOpen, CalendarDays, ClipboardCheck, PackageCheck, Plus, TriangleAlert } from 'lucide-react'
 import { api, errorMessage, type Dashboard } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatDelta, formatQuantity, relativeTime, transactionLabel } from '../../lib/format'
@@ -30,12 +30,13 @@ export function DashboardPage() {
         <Stat label="Pantry items" value={data.pantryCount} note="Tracked in your kitchen" to="/pantry" />
         <Stat label="Low or out of stock" value={data.lowStockCount} note="Below your alert level" to="/pantry?view=low" tone={data.lowStockCount ? 'amber' : undefined} />
         <Stat label="Needs a check" value={data.needsCheck} note="Uncertain or expired stock" to="/pantry?view=check" tone={data.needsCheck ? 'amber' : undefined} />
-        <Stat label="Shopping items" value={data.shoppingCount} note="Still to buy" />
+        <Stat label="Recipes" value={data.recipeCount} note="Built-in and your own" to="/recipes" />
       </section>
 
       <section className="quick-actions" aria-label="Quick actions">
         <Link to="/pantry?add=1"><Plus size={16} aria-hidden />Add ingredient</Link>
         <Link to="/pantry?view=check"><ClipboardCheck size={16} aria-hidden />Verify stock</Link>
+        <Link to="/recipes?new=1"><BookOpen size={16} aria-hidden />Add recipe</Link>
         <span className="disabled" title="Arrives with the Meal Planner milestone"><CalendarDays size={16} aria-hidden />Plan a meal<small>Soon</small></span>
       </section>
 

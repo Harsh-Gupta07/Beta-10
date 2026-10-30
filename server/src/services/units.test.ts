@@ -2,7 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { Prisma } from '@prisma/client'
 import { AppError } from '../lib/errors.js'
-import { expiryState, stockStatus, toCanonical, unitsFor } from './units.js'
+import { expiryState, scaleQuantity, stockStatus, toCanonical, unitsFor } from './units.js'
 
 const D = (value: Prisma.Decimal.Value) => new Prisma.Decimal(value)
 
@@ -36,6 +36,21 @@ describe('toCanonical', () => {
     assert.deepEqual(unitsFor('g'), ['g', 'kg'])
     assert.deepEqual(unitsFor('ml'), ['ml', 'l'])
     assert.deepEqual(unitsFor('count'), ['pcs'])
+  })
+})
+
+describe('scaleQuantity', () => {
+  it('scales mass and volume exactly and rounds counts up', () => {
+    assert.equal(scaleQuantity(D(200), 4, 6, 'g').toString(), '300')
+    assert.equal(scaleQuantity(D(1), 4, 3, 'g').toString(), '0.75')
+    assert.equal(scaleQuantity(D(100), 3, 1, 'ml').toString(), '33.333')
+    assert.equal(scaleQuantity(D(6), 3, 2, 'count').toString(), '4')
+    assert.equal(scaleQuantity(D(1), 4, 1, 'count').toString(), '1')
+  })
+
+  it('rejects invalid servings', () => {
+    assert.throws(() => scaleQuantity(D(1), 4, 0, 'g'), AppError)
+    assert.throws(() => scaleQuantity(D(1), 4, 1.5, 'g'), AppError)
   })
 })
 

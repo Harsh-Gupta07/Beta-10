@@ -8,6 +8,8 @@ import { AuthScreen } from './features/auth/AuthScreen'
 import { HouseholdSetup } from './features/household/HouseholdSetup'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { PantryPage } from './features/pantry/PantryPage'
+import { RecipesPage } from './features/recipes/RecipesPage'
+import { RecipeDetailPage } from './features/recipes/RecipeDetailPage'
 import { ComingSoon } from './features/ComingSoon'
 
 function App() {
@@ -47,7 +49,8 @@ function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/pantry" element={<PantryPage />} />
         <Route path="/planner" element={<ComingSoon title="Meal Planner" milestone="Plan breakfast, lunch and dinner across the week. Planning reserves pantry stock without deducting it, and flags shortages before cooking day." />} />
-        <Route path="/recipes" element={<ComingSoon title="Recipes" milestone="A searchable library of Indian home recipes with structured ingredients that scale to your servings." />} />
+        <Route path="/recipes" element={<RecipesPage />} />
+        <Route path="/recipes/:recipeId" element={<RecipeDetailPage />} />
         <Route path="/shopping" element={<ComingSoon title="Shopping List" milestone="Missing ingredients collected into one list. Stock only increases when you confirm what was actually received." />} />
         <Route path="/assistant" element={<ComingSoon title="AI Assistant" milestone="Ask what you can cook, add stock in plain language, or get shortages explained. The core app keeps working without it." />} />
         <Route path="/settings" element={<ComingSoon title="Household & Settings" milestone="Manage your household name, default servings and members, and invite family to share the same kitchen." />} />

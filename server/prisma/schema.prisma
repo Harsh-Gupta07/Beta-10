@@ -152,8 +152,10 @@ model Recipe {
   name         String
   description  String             @default("")
   category     String             @default("Other")
+  /// Ingredient quantities are written for this many servings and scaled from it.
   baseServings Int                @default(4)
   prepMinutes  Int                @default(30)
+  cookMinutes  Int                @default(0)
   instructions String[]
   isShared     Boolean            @default(false)
   createdAt    DateTime           @default(now())
@@ -168,8 +170,11 @@ model RecipeIngredient {
   id           String     @id @default(cuid())
   recipeId     String
   ingredientId String
+  /// Total for the recipe's baseServings, in the ingredient's canonical unit.
   quantity     Decimal    @db.Decimal(12, 3)
   unit         String
+  note         String     @default("")
+  position     Int        @default(0)
   recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
   @@unique([recipeId, ingredientId])

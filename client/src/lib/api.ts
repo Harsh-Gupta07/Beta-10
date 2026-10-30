@@ -12,7 +12,8 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
     if (!error.response) return 'Could not reach KitchenSync. Check that the API is running.'
     const data = error.response.data as { error?: string; details?: Array<{ path: string; message: string }> } | undefined
     if (data?.details?.length) return `${data.error ?? fallback} (${data.details.map(d => `${d.path || 'request'}: ${d.message}`).join('; ')})`
-    return data?.error ?? fallback
+    // No API error body means something in between answered (dev proxy, gateway): say so instead of hiding it.
+    return data?.error ?? `${fallback} The server responded with ${error.response.status} ${error.response.statusText}; check that the API is running and restart \`npm run dev\`.`
   }
   return fallback
 }
@@ -54,6 +55,33 @@ export type StockTransaction = {
   ingredient: { id: string; name: string }
   actor: { id: string; name: string }
 }
+
+export type RecipeSummary = {
+  id: string
+  name: string
+  description: string
+  category: string
+  baseServings: number
+  prepMinutes: number
+  cookMinutes: number
+  custom: boolean
+  ingredientCount: number
+  /** Lines the pantry can't cover at the household's usual servings. */
+  missingCount: number
+  updatedAt: string
+}
+
+export type RecipeLine = {
+  ingredient: { id: string; name: string; category: string; canonicalUnit: CanonicalUnit }
+  quantity: string
+  unit: CanonicalUnit
+  note: string
+  inPantry: string | null
+  missing: string
+  enough: boolean
+}
+
+export type RecipeDetail = RecipeSummary & { servings: number; instructions: string[]; ingredients: RecipeLine[] }
 
 export type Dashboard = {
   household: Household

@@ -48,6 +48,16 @@ export function toCanonical(quantity: Prisma.Decimal.Value, unit: InputUnit, can
   return result
 }
 
+/**
+ * Scales a recipe quantity written for `baseServings` to `servings` with decimal math.
+ * Piece counts round up (you can't use 1.5 eggs from the pantry); mass/volume keep 3 decimals.
+ */
+export function scaleQuantity(quantity: Decimal, baseServings: number, servings: number, unit: CanonicalUnit): Decimal {
+  if (!Number.isInteger(baseServings) || baseServings < 1 || !Number.isInteger(servings) || servings < 1) throw new AppError(400, 'Servings must be a whole number of at least 1.')
+  const scaled = quantity.times(servings).dividedBy(baseServings)
+  return unit === 'count' ? scaled.toDecimalPlaces(0, Decimal.ROUND_CEIL) : scaled.toDecimalPlaces(3, Decimal.ROUND_HALF_UP)
+}
+
 export type StockStatus = 'OUT' | 'LOW' | 'OK'
 
 export function stockStatus(quantity: Decimal, lowStockThreshold: Decimal | null): StockStatus {

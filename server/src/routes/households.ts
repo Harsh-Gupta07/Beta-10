@@ -4,10 +4,11 @@ import { prisma } from '../lib/prisma.js'
 import { requireHouseholdMember, requireUser } from '../middleware/auth.js'
 import { listPantry, recentActivity } from '../services/pantry.js'
 import { pantryRouter } from './pantry.js'
+import { recipeRouter } from './recipes.js'
 
 export const householdRouter = Router()
 householdRouter.use(requireUser)
-householdRouter.use('/:householdId', requireHouseholdMember, pantryRouter)
+householdRouter.use('/:householdId', requireHouseholdMember, pantryRouter, recipeRouter)
 
 householdRouter.post('/', async (req, res, next) => {
   try {
