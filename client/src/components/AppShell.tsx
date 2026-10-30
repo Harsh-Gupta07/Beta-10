@@ -7,7 +7,7 @@ type NavItem = { to: string; label: string; short: string; icon: LucideIcon; rea
 
 export const navItems: NavItem[] = [
   { to: '/', label: 'Dashboard', short: 'Home', icon: LayoutDashboard, ready: true },
-  { to: '/planner', label: 'Meal Planner', short: 'Plan', icon: CalendarDays, ready: false },
+  { to: '/planner', label: 'Meal Planner', short: 'Plan', icon: CalendarDays, ready: true },
   { to: '/recipes', label: 'Recipes', short: 'Recipes', icon: BookOpen, ready: true },
   { to: '/pantry', label: 'Pantry', short: 'Pantry', icon: Refrigerator, ready: true },
   { to: '/shopping', label: 'Shopping List', short: 'Shop', icon: ShoppingCart, ready: false },

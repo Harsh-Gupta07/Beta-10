@@ -83,14 +83,50 @@ export type RecipeLine = {
 
 export type RecipeDetail = RecipeSummary & { servings: number; instructions: string[]; ingredients: RecipeLine[] }
 
+export type MealSlot = 'BREAKFAST' | 'LUNCH' | 'DINNER'
+export type MealStatus = 'PLANNED' | 'COOKING' | 'COMPLETED' | 'CANCELLED'
+
+export type PlannedMeal = {
+  id: string
+  date: string
+  slot: MealSlot
+  servings: number
+  status: MealStatus
+  recipe: { id: string; name: string; category: string; baseServings: number; custom: boolean }
+  /** Whether this meal currently holds a reservation on pantry stock. */
+  reservesStock: boolean
+  isPast: boolean
+  shortCount: number
+  lines: Array<{ ingredient: { id: string; name: string }; unit: CanonicalUnit; required: string; allocated: string | null; shortage: string | null }>
+}
+
+export type StockPosition = {
+  ingredient: { id: string; name: string; category: string }
+  unit: CanonicalUnit
+  onHand: string
+  required: string
+  allocated: string
+  unallocated: string
+  shortage: string
+  neededBy: number
+  affectedMeals: number
+  firstAffected: { mealId: string; date: string; slot: MealSlot; recipeName: string } | null
+}
+export type Shortage = StockPosition & { firstAffected: NonNullable<StockPosition['firstAffected']> }
+
+export type PlannerWeek = { today: string; weekStart: string; weekEnd: string; defaultServings: number; meals: PlannedMeal[]; stock: StockPosition[]; shortages: Shortage[] }
+
 export type Dashboard = {
   household: Household
+  today: string
   pantryCount: number
   lowStock: PantryItem[]
   lowStockCount: number
   needsCheck: number
   recipeCount: number
-  meals: Array<{ id: string; slot: string; date: string; servings: number; recipe: { name: string } }>
+  todayMeals: PlannedMeal[]
+  upcomingMeals: PlannedMeal[]
+  shortages: Shortage[]
   shoppingCount: number
   activity: StockTransaction[]
 }

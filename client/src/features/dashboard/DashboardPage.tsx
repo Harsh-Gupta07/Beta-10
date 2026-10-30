@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, BookOpen, CalendarDays, ClipboardCheck, PackageCheck, Plus, TriangleAlert } from 'lucide-react'
+import { Activity, BookOpen, CalendarCheck, CalendarDays, ClipboardCheck, PackageCheck, Plus, TriangleAlert } from 'lucide-react'
 import { api, errorMessage, type Dashboard } from '../../lib/api'
 import { useSession } from '../../lib/session'
-import { formatDelta, formatQuantity, relativeTime, transactionLabel } from '../../lib/format'
+import { formatDay, formatDelta, formatQuantity, relativeDay, relativeTime, slotLabel, statusLabel, transactionLabel } from '../../lib/format'
+import { ShortageList } from '../planner/ShortageList'
 import { Badge, EmptyState, Notice, PageHeader, Spinner } from '../../components/ui'
 
 export function DashboardPage() {
@@ -18,10 +19,9 @@ export function DashboardPage() {
   }, [household.id])
   useEffect(() => { void load() }, [load])
 
-  const today = new Intl.DateTimeFormat('en-IN', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase()
 
   return <>
-    <PageHeader eyebrow={today} title="Your kitchen, in sync." description={`${household.name} · usually cooking for ${household.defaultServings}`}
+    <PageHeader eyebrow={data ? formatDay(data.today, 'long').toUpperCase() : 'DASHBOARD'} title="Your kitchen, in sync." description={`${household.name} · usually cooking for ${household.defaultServings}`}
       actions={<Link className="primary-button" to="/pantry?add=1"><Plus size={16} aria-hidden />Add ingredient</Link>} />
     {error && <Notice onRetry={load}>{error}</Notice>}
     {!data && !error && <Spinner label="Loading dashboard…" />}
@@ -29,7 +29,7 @@ export function DashboardPage() {
       <section className="stat-grid">
         <Stat label="Pantry items" value={data.pantryCount} note="Tracked in your kitchen" to="/pantry" />
         <Stat label="Low or out of stock" value={data.lowStockCount} note="Below your alert level" to="/pantry?view=low" tone={data.lowStockCount ? 'amber' : undefined} />
-        <Stat label="Needs a check" value={data.needsCheck} note="Uncertain or expired stock" to="/pantry?view=check" tone={data.needsCheck ? 'amber' : undefined} />
+        <Stat label="Upcoming shortages" value={data.shortages.length} note="Ingredients planned meals lack" to="/planner" tone={data.shortages.length ? 'amber' : undefined} />
         <Stat label="Recipes" value={data.recipeCount} note="Built-in and your own" to="/recipes" />
       </section>
 
@@ -37,15 +37,26 @@ export function DashboardPage() {
         <Link to="/pantry?add=1"><Plus size={16} aria-hidden />Add ingredient</Link>
         <Link to="/pantry?view=check"><ClipboardCheck size={16} aria-hidden />Verify stock</Link>
         <Link to="/recipes?new=1"><BookOpen size={16} aria-hidden />Add recipe</Link>
-        <span className="disabled" title="Arrives with the Meal Planner milestone"><CalendarDays size={16} aria-hidden />Plan a meal<small>Soon</small></span>
+        <Link to="/planner"><CalendarDays size={16} aria-hidden />Plan a meal</Link>
       </section>
 
       <section className="content-grid">
         <article className="panel">
-          <div className="panel-heading"><div><p className="eyebrow">UP NEXT</p><h2>Today’s meals</h2></div></div>
-          {data.meals.length
-            ? <div className="meal-list">{data.meals.map(meal => <div className="meal-row" key={meal.id}><span className="meal-time">{meal.slot.toLowerCase()}</span><strong>{meal.recipe.name}</strong><span>{meal.servings} servings</span></div>)}</div>
-            : <EmptyState icon={CalendarDays} title="No meals planned for today">The weekly planner arrives in the next milestones. Until then, keep your pantry accurate so planning starts from real stock.</EmptyState>}
+          <div className="panel-heading"><div><p className="eyebrow">UP NEXT</p><h2>Today’s meals</h2></div><Link to="/planner">Open planner</Link></div>
+          {data.todayMeals.length
+            ? <div className="meal-list">{data.todayMeals.map(meal => <Link to="/planner" className="meal-row" key={meal.id}>
+                <span className="meal-time">{slotLabel[meal.slot]}</span><strong>{meal.recipe.name}</strong>
+                <span>{meal.status !== 'PLANNED' ? statusLabel[meal.status] : meal.shortCount ? <Badge tone="red">{meal.shortCount} short</Badge> : `${meal.servings} servings`}</span>
+              </Link>)}</div>
+            : <EmptyState icon={CalendarDays} title="No meals planned for today" action={<Link className="secondary-button" to="/planner">Plan a meal</Link>}>Plan a meal and KitchenSync reserves the stock it needs and warns you about shortages.</EmptyState>}
+          {data.upcomingMeals.length > 0 && <>
+            <p className="eyebrow sub-eyebrow">COMING UP</p>
+            <ul className="compact-list">{data.upcomingMeals.map(meal => <li key={meal.id}>
+              <span>{meal.recipe.name}</span>
+              <span className="compact-meta">{relativeDay(meal.date, data.today)} · {slotLabel[meal.slot].toLowerCase()}</span>
+              {meal.shortCount > 0 && <Badge tone="red">{meal.shortCount} short</Badge>}
+            </li>)}</ul>
+          </>}
         </article>
 
         <article className="panel">
@@ -56,6 +67,13 @@ export function DashboardPage() {
         </article>
       </section>
 
+      <section className="content-grid">
+      <article className="panel">
+        <div className="panel-heading"><div><p className="eyebrow">PLANNED MEALS</p><h2>Upcoming shortages</h2></div><Link to="/planner">View plan</Link></div>
+        {data.shortages.length
+          ? <ShortageList shortages={data.shortages} today={data.today} limit={4} />
+          : <EmptyState icon={CalendarCheck} title="No shortages ahead">{data.upcomingMeals.length || data.todayMeals.length ? 'Your pantry covers every upcoming planned meal.' : 'Plan meals to see what you’ll run short of.'}</EmptyState>}
+      </article>
       <article className="panel activity-panel">
         <div className="panel-heading"><div><p className="eyebrow">STOCK HISTORY</p><h2>Recent activity</h2></div></div>
         {data.activity.length
@@ -66,6 +84,7 @@ export function DashboardPage() {
             </li>)}</ul>
           : <EmptyState icon={Activity} title="No stock changes yet">Every addition, use and correction will be recorded here.</EmptyState>}
       </article>
+      </section>
 
       {data.needsCheck > 0 && <Link to="/pantry?view=check" className="callout warning"><TriangleAlert size={18} aria-hidden /><span><strong>{data.needsCheck} item{data.needsCheck === 1 ? '' : 's'} need a quick check.</strong> A 10-second look keeps your plans accurate.</span></Link>}
     </>}

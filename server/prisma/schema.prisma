@@ -79,6 +79,8 @@ model Household {
   id               String            @id @default(cuid())
   name             String
   defaultServings  Int               @default(3)
+  /// IANA zone used to decide what "today" is for meal planning and the dashboard.
+  timezone         String            @default("Asia/Kolkata")
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   members          HouseholdMember[]

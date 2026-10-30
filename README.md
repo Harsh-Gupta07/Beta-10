@@ -9,8 +9,9 @@ KitchenSync is a responsive household kitchen assistant that keeps meal plans, p
 | 1. Foundation: auth, households, sessions, dashboard shell | Done |
 | 2. Pantry: inventory CRUD, units, confidence, stock checks, history | Done |
 | 3. Recipes: library, custom recipes, serving scaling, 15 Indian recipes | Done |
-| 4. Weekly meal planner | Next |
-| 5–10. Allocation and shortages, cooking, shopping, verification queue, AI assistant | Planned |
+| 4. Meal planner with allocation engine and shortage detection | Done |
+| 5. Cooking mode with idempotent stock deduction | Next |
+| 6–8. Shopping list, verification queue, AI assistant | Planned |
 
 Navigation entries for unbuilt modules open an honest "coming soon" page.
 
@@ -22,6 +23,14 @@ Navigation entries for unbuilt modules open an honest "coming soon" page.
 - Scale any recipe from 1 to 50 servings. Scaling uses decimal math; piece counts (eggs, lemons) round up.
 - Create, edit and delete your own recipes. Built-in recipes are read-only; "Make a copy to edit" creates a household copy.
 - A recipe used by planned meals cannot be deleted.
+
+### Meal planner, allocation and shortages (Milestone 4)
+
+- Week view with breakfast, lunch and dinner for each day; previous/next week navigation. Add, change recipe, move, adjust servings and cancel meals. Meals can't be planned in the past; a cancelled meal's slot can be re-planned.
+- "Today" follows the household's timezone (default `Asia/Kolkata`), so the planner and dashboard switch days at local midnight.
+- **Allocation engine** (`server/src/services/allocation.ts`): walks every meal that reserves stock (planned from today on, or being cooked) in date and slot order and reserves on-hand stock first come, first served. It reports on hand, allocated, unallocated and shortage per ingredient, and required / reserved / short per meal. Stock is never reserved twice, and **planning never deducts pantry stock**.
+- Allocations are recomputed from current data on every read, so any change to meals, servings, recipes or pantry stock is reflected immediately and can never be stale.
+- **Shortages** list each missing ingredient with required, available and short quantities, the number of affected meals, and the first affected meal and date. Shown in the planner and on the dashboard.
 
 ### Pantry (Milestone 2)
 
@@ -57,7 +66,7 @@ The UI is at `http://localhost:5173`; the API health endpoint is `http://localho
 
 ## Tests
 
-`npm test` runs unit tests (unit conversion, recipe scaling, stock status) and API integration tests (pantry CRUD, decimal precision, concurrent usage, verification, history, recipe scaling and pantry comparison, read-only built-in recipes, household isolation) against a real PostgreSQL database.
+`npm test` runs unit tests (unit conversion, recipe scaling, stock status) and API integration tests (pantry CRUD, decimal precision, concurrent usage, verification, history, recipe scaling and pantry comparison, read-only built-in recipes, the spec's milk planning journey, slot rules, household isolation). The allocation engine also has unit tests for the spec's rice example and order independence against a real PostgreSQL database.
 
 1. Create a second database, e.g. `CREATE DATABASE kitchensync_test OWNER kitchensync;`
 2. Set `TEST_DATABASE_URL` in `server/.env`. Its name must contain `test`; the runner refuses anything else.
@@ -79,10 +88,10 @@ The UI is at `http://localhost:5173`; the API health endpoint is `http://localho
 
 ```text
 client/              React + Vite user interface
-client/src/features/  One folder per product area (auth, household, dashboard, pantry, recipes)
+client/src/features/  One folder per product area (auth, household, dashboard, pantry, recipes, planner)
 client/src/components/ Shared UI: app shell, modal, badges, empty/loading/error states
 server/src/routes/    Express routers: validation and HTTP only
-server/src/services/  Domain logic: pantry mutations, recipes, unit conversion and scaling
+server/src/services/  Domain logic: pantry, recipes, planner, allocation engine, units, dates
 server/scripts/       Test runner
 server/prisma/        PostgreSQL schema, migrations, seed script and recipe data
 ARCHITECTURE.md       Domain model, API plan, screens, risks and roadmap

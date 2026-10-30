@@ -5,10 +5,12 @@ import { requireHouseholdMember, requireUser } from '../middleware/auth.js'
 import { listPantry, recentActivity } from '../services/pantry.js'
 import { pantryRouter } from './pantry.js'
 import { recipeRouter } from './recipes.js'
+import { plannerRouter } from './planner.js'
+import { overview } from '../services/planner.js'
 
 export const householdRouter = Router()
 householdRouter.use(requireUser)
-householdRouter.use('/:householdId', requireHouseholdMember, pantryRouter, recipeRouter)
+householdRouter.use('/:householdId', requireHouseholdMember, pantryRouter, recipeRouter, plannerRouter)
 
 householdRouter.post('/', async (req, res, next) => {
   try {
@@ -22,17 +24,17 @@ householdRouter.post('/', async (req, res, next) => {
 householdRouter.get('/:householdId/dashboard', requireHouseholdMember, async (_req, res, next) => {
   try {
     const householdId = res.locals.householdId as string
-    const [household, pantry, recipeCount, meals, shoppingCount, activity] = await Promise.all([
-      prisma.household.findUniqueOrThrow({ where: { id: householdId }, select: { id: true, name: true, defaultServings: true } }),
+    const [household, pantry, recipeCount, plan, shoppingCount, activity] = await Promise.all([
+      prisma.household.findUniqueOrThrow({ where: { id: householdId }, select: { id: true, name: true, defaultServings: true, timezone: true } }),
       listPantry(householdId),
       prisma.recipe.count({ where: { OR: [{ householdId }, { isShared: true }] } }),
-      prisma.plannedMeal.findMany({ where: { mealPlan: { householdId }, date: new Date(new Date().toISOString().slice(0, 10)), status: { in: ['PLANNED', 'COOKING'] } }, include: { recipe: { select: { name: true } } }, orderBy: { slot: 'asc' } }),
+      overview(householdId),
       prisma.shoppingListItem.count({ where: { shoppingList: { householdId }, status: 'NEEDED' } }),
       recentActivity(householdId),
     ])
     const lowStock = pantry.filter(item => item.status !== 'OK').slice(0, 5)
     const needsCheck = pantry.filter(item => item.confidence === 'CHECK_NEEDED' || item.expiry === 'EXPIRED').length
-    res.json({ household, pantryCount: pantry.length, lowStock, lowStockCount: pantry.filter(item => item.status !== 'OK').length, needsCheck, recipeCount, meals, shoppingCount, activity })
+    res.json({ household, today: plan.today, pantryCount: pantry.length, lowStock, lowStockCount: pantry.filter(item => item.status !== 'OK').length, needsCheck, recipeCount, todayMeals: plan.todayMeals, upcomingMeals: plan.upcomingMeals, shortages: plan.shortages, shoppingCount, activity })
   } catch (error) { next(error) }
 })
 

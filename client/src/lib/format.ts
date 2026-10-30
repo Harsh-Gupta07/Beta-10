@@ -1,4 +1,4 @@
-import type { CanonicalUnit, Confidence, InputUnit, StockTransaction } from './api'
+import type { CanonicalUnit, Confidence, InputUnit, MealSlot, MealStatus, StockTransaction } from './api'
 
 // Display-only helpers. Quantities arrive as decimal strings; Number() is used purely for presentation,
 // never for values sent back to the server.
@@ -44,3 +44,26 @@ export function relativeTime(value: string | null): string {
 
 /** yyyy-mm-dd for <input type="date"> from an ISO timestamp stored at UTC midnight. */
 export const toDateInput = (value: string | null) => value ? value.slice(0, 10) : ''
+
+export const slots: MealSlot[] = ['BREAKFAST', 'LUNCH', 'DINNER']
+export const slotLabel: Record<MealSlot, string> = { BREAKFAST: 'Breakfast', LUNCH: 'Lunch', DINNER: 'Dinner' }
+export const statusLabel: Record<MealStatus, string> = { PLANNED: 'Planned', COOKING: 'Cooking', COMPLETED: 'Completed', CANCELLED: 'Cancelled' }
+
+/** Formats a YYYY-MM-DD calendar date; parsed as UTC so the day never shifts with the browser's zone. */
+export function formatDay(value: string, style: 'short' | 'long' = 'short'): string {
+  const options: Intl.DateTimeFormatOptions = style === 'short' ? { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' } : { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }
+  return new Intl.DateTimeFormat('en-IN', options).format(new Date(`${value}T00:00:00Z`))
+}
+
+export function addDays(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+/** "Today", "Tomorrow" or a short date, relative to the household's today. */
+export function relativeDay(value: string, today: string): string {
+  if (value === today) return 'Today'
+  if (value === addDays(today, 1)) return 'Tomorrow'
+  return formatDay(value)
+}

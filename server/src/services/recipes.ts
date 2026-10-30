@@ -16,7 +16,7 @@ export type RecipeInput = {
 }
 
 /** Recipes a household can see: its own plus the shared (seeded) catalog. */
-const visibleTo = (householdId: string): Prisma.RecipeWhereInput => ({ OR: [{ householdId }, { householdId: null, isShared: true }] })
+export const visibleTo = (householdId: string): Prisma.RecipeWhereInput => ({ OR: [{ householdId }, { householdId: null, isShared: true }] })
 
 const lineInclude = { ingredient: { select: { id: true, name: true, category: true, canonicalUnit: true } } } as const
 const recipeInclude = { ingredients: { include: lineInclude, orderBy: { position: 'asc' } } } as const satisfies Prisma.RecipeInclude
