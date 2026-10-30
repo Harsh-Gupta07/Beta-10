@@ -1,51 +1,39 @@
 # KitchenSync (Beta-10)
 
-KitchenSync is a responsive household kitchen assistant that keeps meal plans, pantry stock, shopping, and real consumption connected. The Phase 1 flow is **Plan → Allocate → Detect shortage → Shop → Cook → Deduct → Verify**.
+KitchenSync is a responsive household kitchen assistant that keeps meal plans, pantry stock, shopping and real consumption connected. The Phase 1 flow is **Plan → Allocate → Detect shortage → Shop → Cook → Deduct → Verify**, and every module feeds the next.
 
-## Current status
+## Phase 1 status
 
-| Milestone | Status |
+All ten Phase 1 modules are implemented and covered by automated tests (47 tests, including the brief's end-to-end integration journey).
+
+| Module | What you can do |
 | --- | --- |
-| 1. Foundation: auth, households, sessions, dashboard shell | Done |
-| 2. Pantry: inventory CRUD, units, confidence, stock checks, history | Done |
-| 3. Recipes: library, custom recipes, serving scaling, 15 Indian recipes | Done |
-| 4. Meal planner with allocation engine and shortage detection | Done |
-| 5. Cooking mode with idempotent stock deduction | Next |
-| 6–8. Shopping list, verification queue, AI assistant | Planned |
+| Accounts & household | Register, sign in, profile and password; create a household or join one with an invite code; owner manages name, usual servings, timezone, invites and members |
+| Pantry | Add, edit, delete, search and filter stock in g/kg, ml/L or pcs; confidence (Confirmed / Estimated / Check needed), low-stock alerts, purchase and expiry dates, full stock history |
+| Recipes | 15 built-in Indian recipes plus your own; search, categories, "Ready to cook", scaling to any servings, copy a built-in recipe to edit it |
+| Meal planner | Breakfast, lunch and dinner for each day; add, change, move, re-serve and cancel meals |
+| Allocation engine | Reserves on-hand stock for meals in date order; tracks on hand, allocated, unallocated and shortage; planning never deducts stock |
+| Shortages | Missing ingredient, required / available / short quantity, affected meals, first affected meal and date; one tap to add to the shopping list |
+| Cooking | Start cooking, confirm what was actually used, complete; stock is deducted exactly once, even with double clicks or two people completing at the same moment |
+| Shopping list | Live suggestions from shortages, manual items, quantity edits, purchased tick, confirmed receipt (only this increases stock), partial deliveries, copy and share |
+| Stock verification | Prioritised "Quick stock check" of uncertain items that upcoming meals depend on; quick actions; automatic recalculation and notifications when a plan is affected |
+| AI assistant | Chat powered by Google Gemini; answers from your real data; any change is a card you confirm; works in a basic offline mode without a key |
 
-Navigation entries for unbuilt modules open an honest "coming soon" page.
+## How the important rules are enforced
 
-### Recipes (Milestone 3)
-
-- 15 shared Indian recipes (dal tadka, rajma chawal, poha, pulao, paneer bhurji, aloo paratha, khichdi, aloo gobi with roti, upma, chole, palak paneer, masoor dal, besan chilla, masala chai, egg bhurji), defined in `server/prisma/recipes.data.ts`.
-- Every ingredient line references a catalog ingredient and is stored in its canonical unit, so recipes and pantry stock are directly comparable.
-- Search, category filter and a "Ready to cook" filter. Each recipe shows which ingredients your pantry is short on at your usual servings. This is an on-hand comparison; reserving stock across planned meals belongs to the allocation engine.
-- Scale any recipe from 1 to 50 servings. Scaling uses decimal math; piece counts (eggs, lemons) round up.
-- Create, edit and delete your own recipes. Built-in recipes are read-only; "Make a copy to edit" creates a household copy.
-- A recipe used by planned meals cannot be deleted.
-
-### Meal planner, allocation and shortages (Milestone 4)
-
-- Week view with breakfast, lunch and dinner for each day; previous/next week navigation. Add, change recipe, move, adjust servings and cancel meals. Meals can't be planned in the past; a cancelled meal's slot can be re-planned.
-- "Today" follows the household's timezone (default `Asia/Kolkata`), so the planner and dashboard switch days at local midnight.
-- **Allocation engine** (`server/src/services/allocation.ts`): walks every meal that reserves stock (planned from today on, or being cooked) in date and slot order and reserves on-hand stock first come, first served. It reports on hand, allocated, unallocated and shortage per ingredient, and required / reserved / short per meal. Stock is never reserved twice, and **planning never deducts pantry stock**.
-- Allocations are recomputed from current data on every read, so any change to meals, servings, recipes or pantry stock is reflected immediately and can never be stale.
-- **Shortages** list each missing ingredient with required, available and short quantities, the number of affected meals, and the first affected meal and date. Shown in the planner and on the dashboard.
-
-### Pantry (Milestone 2)
-
-- Add, edit, delete, search, category filters and views (low stock, needs check, expiring).
-- Quantities are stored as PostgreSQL `numeric` in each ingredient's canonical unit (`g`, `ml` or `count`). Input accepts g/kg, ml/L or pcs. Conversions across families (for example ml of rice) are rejected.
-- Stock confidence: Confirmed, Estimated or Check needed. A stock check ("Quantity is correct", "Update quantity", "Mark as finished") always sets Confirmed and records an `InventoryVerification`.
-- Low-stock alerts per item, purchase/expiry dates, last-verified time and stock source.
-- Every quantity change writes an append-only `StockTransaction` with the balance after the change. History is kept after an item is deleted.
-- Mutations lock the pantry row (`SELECT … FOR UPDATE`) inside a transaction, so concurrent edits from household members cannot drive stock negative.
-- Households can add custom ingredients; they are private to that household.
+- **Planning never deducts stock.** Allocations are computed from current data on every read (`server/src/services/allocation.ts`), so they are never stale and never touch the pantry.
+- **Only confirmed receipts increase stock.** Marking a shopping item purchased is bookkeeping; `receiveStock` is the only path that adds purchased stock, and its idempotency key makes a repeated receipt impossible.
+- **Cooking deducts once.** Completion locks the meal row, returns the original result if the meal is already completed, and `CookingEvent.plannedMealId` is unique in the database. Each deduction is a `COOKING_CONSUMPTION` stock transaction.
+- **Stock never goes negative.** If more was used than recorded, stock goes to 0 and is flagged *Check needed*.
+- **Decimal quantities only.** PostgreSQL `numeric(12,3)` in each ingredient's canonical unit (`g`, `ml`, `count`); conversions only within a family (kg→g, L→ml); "ml of rice" is rejected.
+- **Household isolation.** Every route is scoped by membership on the server; other households get 404.
+- **AI never owns the numbers.** Gemini interprets language and explains. Scaling, allocations, shortages and stock changes come from the tested services, and the assistant can only propose changes that you confirm.
 
 ## Requirements
 
 - Node.js 20 or newer and npm
 - PostgreSQL 15 or newer
+- Optional: a Google Gemini API key for the AI assistant
 
 ## Local setup
 
@@ -56,21 +44,33 @@ Navigation entries for unbuilt modules open an honest "coming soon" page.
    CREATE ROLE kitchensync LOGIN CREATEDB PASSWORD 'choose-a-password';
    CREATE DATABASE kitchensync OWNER kitchensync;
    ```
+
 3. Install dependencies with `npm install`.
 4. Apply the committed migrations (this also generates Prisma Client) with `npm run db:migrate`.
-5. Seed the canonical ingredient catalog with `npm run db:seed`.
-6. Start client and API with `npm run dev`.
-7. Optional: run the test suite with `npm test` (see below).
+5. Seed the ingredient catalog and the 15 recipes with `npm run db:seed`.
+6. Start client and API with `npm run dev`, then open `http://localhost:5173`.
 
-The UI is at `http://localhost:5173`; the API health endpoint is `http://localhost:4000/api/v1/health`. AI configuration is optional; `AI_API_KEY` is not used until the assistant milestone.
+After pulling new changes, run `npm run db:migrate` and `npm run db:seed` again.
+
+The client calls the API through Vite's `/api` proxy, so the app works when opened via `localhost`, `127.0.0.1` or your LAN IP (handy for testing on a phone).
+
+## AI assistant setup (optional)
+
+1. Create a key at [Google AI Studio](https://aistudio.google.com) → **Get API key**.
+2. Put it in `server/.env` as `AI_API_KEY=...` (never commit it, never paste it in chats or screenshots) and restart the API.
+3. Settings → *AI assistant* shows whether it is connected.
+
+`AI_MODEL` (default `gemini-2.5-flash`) is used first. If it is overloaded, rate-limited or slow, the whole answer is retried once on `AI_FALLBACK_MODEL` (default `gemini-flash-lite-latest`). If both fail, or no key is set, the assistant answers simple questions ("what can I cook?", "what am I short of?") from your data in an offline mode, and the rest of the app is unaffected.
+
+The free tier allows only a few requests per minute, and one question can take 2–3 requests when the assistant looks up data. Only ingredient names, quantities, recipe and meal information, and your message are sent to Google; account details are not.
 
 ## Tests
 
-`npm test` runs unit tests (unit conversion, recipe scaling, stock status) and API integration tests (pantry CRUD, decimal precision, concurrent usage, verification, history, recipe scaling and pantry comparison, read-only built-in recipes, the spec's milk planning journey, slot rules, household isolation). The allocation engine also has unit tests for the spec's rice example and order independence against a real PostgreSQL database.
+`npm test` runs 47 tests against a real PostgreSQL database: unit conversion, scaling, the allocation engine (including the brief's rice example), pantry, recipes, planner, cooking (double and simultaneous completion), shopping (partial delivery, double receipt), verification and notifications, household invites and permissions, the assistant's offline mode and ingredient matching, and the brief's full integration journey (`server/src/routes/journey.test.ts`).
 
 1. Create a second database, e.g. `CREATE DATABASE kitchensync_test OWNER kitchensync;`
 2. Set `TEST_DATABASE_URL` in `server/.env`. Its name must contain `test`; the runner refuses anything else.
-3. `npm test` applies migrations and the seed to that database, then runs the tests. Tests create uniquely named users, so the database never needs wiping.
+3. `npm test` applies migrations and the seed to that database, then runs the tests. Tests create uniquely named users, so the database never needs wiping. `AI_API_KEY` is blanked during tests, so they never spend API quota.
 
 ## Environment variables
 
@@ -79,33 +79,28 @@ The UI is at `http://localhost:5173`; the API health endpoint is `http://localho
 | `NODE_ENV` | No | Runtime mode; defaults to development |
 | `PORT` | No | API port; defaults to 4000 |
 | `CLIENT_ORIGIN` | No | Allowed browser origin; defaults to Vite's local URL |
-| `DATABASE_URL` | Yes | PostgreSQL connection used by Prisma and session store |
-| `SESSION_SECRET` | Yes | Secret used to sign secure session identifiers |
-| `AI_API_KEY` | No | Reserved for the later server-side assistant integration |
+| `DATABASE_URL` | Yes | PostgreSQL connection used by Prisma and the session store |
+| `SESSION_SECRET` | Yes | Secret used to sign session cookies (32+ characters) |
+| `AI_API_KEY` | No | Google Gemini API key; without it the assistant runs in offline mode |
+| `AI_MODEL` | No | Main Gemini model; default `gemini-2.5-flash` |
+| `AI_FALLBACK_MODEL` | No | Model tried when the main one is unavailable; default `gemini-flash-lite-latest` |
 | `TEST_DATABASE_URL` | For tests | Separate database used by `npm test` |
 
 ## Project layout
 
 ```text
-client/              React + Vite user interface
-client/src/features/  One folder per product area (auth, household, dashboard, pantry, recipes, planner)
-client/src/components/ Shared UI: app shell, modal, badges, empty/loading/error states
-server/src/routes/    Express routers: validation and HTTP only
-server/src/services/  Domain logic: pantry, recipes, planner, allocation engine, units, dates
-server/scripts/       Test runner
-server/prisma/        PostgreSQL schema, migrations, seed script and recipe data
-ARCHITECTURE.md       Domain model, API plan, screens, risks and roadmap
+client/src/features/   One folder per product area: auth, household, dashboard, pantry, recipes,
+                       planner, cooking, shopping, verification, assistant, settings
+client/src/components/ Shared UI: app shell, notification bell, modal, badges, empty/loading/error states
+client/src/lib/        API client and types, formatting helpers, session context
+server/src/routes/     Express routers: validation and HTTP only (plus *.test.ts API tests)
+server/src/services/   Domain logic: pantry, recipes, planner, allocation, cooking, shopping,
+                       verification, notifications, household, assistant, units, dates
+server/prisma/         PostgreSQL schema, migrations, seed script and recipe data
+server/scripts/        Test runner
+ARCHITECTURE.md        Domain model, API, design decisions and risks
 ```
 
-## Product rules
+## Out of scope for Phase 1
 
-- Meal planning allocates stock but does not deduct it.
-- Only confirmed received quantities increase pantry stock.
-- Cooking deductions will be transactional and idempotent.
-- Household-owned data must be authorized by membership on the server.
-- Stock calculations use decimal quantities and compatible canonical units.
-- AI may interpret or explain; deterministic server code owns inventory math.
-
-## Current configuration limitation
-
-No database connection or AI credential is included in this repository. The API validates required configuration at startup. Configure PostgreSQL before starting the server; AI remains optional.
+Live grocery integrations (Blinkit, Zepto, Swiggy), barcode scanning, receipt OCR, IoT and predictive analytics. Shopping uses a manual hand-off: copy or share the list, then confirm what arrived.
