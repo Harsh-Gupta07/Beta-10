@@ -13,10 +13,15 @@ The initial foundation is in place: a React/Vite client shell, Express API, Post
 
 ## Local setup
 
-1. Copy `.env.example` to `.env` and set `DATABASE_URL` and a random `SESSION_SECRET` of at least 32 characters.
-2. Create a local PostgreSQL database named `kitchensync` (or adjust `DATABASE_URL`).
+1. Copy `server/.env.example` to `server/.env` and set `DATABASE_URL` and a random `SESSION_SECRET` of at least 32 characters. The file lives in `server/` because both the API and the Prisma CLI run from that folder.
+2. Create a PostgreSQL role and database for the app (the role needs `CREATEDB` so `prisma migrate dev` can create its shadow database):
+
+   ```sql
+   CREATE ROLE kitchensync LOGIN CREATEDB PASSWORD 'choose-a-password';
+   CREATE DATABASE kitchensync OWNER kitchensync;
+   ```
 3. Install dependencies with `npm install`.
-4. Generate Prisma Client and apply the initial schema with `npm run db:generate` and `npm run db:migrate`.
+4. Apply the committed migrations (this also generates Prisma Client) with `npm run db:migrate`.
 5. Seed the canonical ingredient catalog with `npm run db:seed`.
 6. Start client and API with `npm run dev`.
 

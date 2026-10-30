@@ -95,4 +95,4 @@ All household-owned rows carry a household relationship (directly or through a p
 
 ## Initial configuration required
 
-Copy `.env.example` to `.env`, set a PostgreSQL `DATABASE_URL` and a strong `SESSION_SECRET`, then run Prisma migrations. `AI_API_KEY` is optional; without it the assistant uses a clearly stated local fallback. No credentials are committed.
+Copy `server/.env.example` to `server/.env`, set a PostgreSQL `DATABASE_URL` and a strong `SESSION_SECRET`, then run Prisma migrations. `AI_API_KEY` is optional; without it the assistant uses a clearly stated local fallback. No credentials are committed.
