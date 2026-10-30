@@ -135,6 +135,13 @@ export async function getWeek(householdId: string, week?: DateString) {
   }
 }
 
+/** Every ingredient upcoming meals need, with on-hand, allocated, unallocated and shortage. */
+export async function getStockPositions(householdId: string) {
+  const { timezone } = await household(householdId)
+  const { meals, result, ingredients } = await computeAllocation(householdId, localToday(timezone))
+  return stockPositions(result, meals, ingredients)
+}
+
 export async function getShortages(householdId: string) {
   const { timezone } = await household(householdId)
   const { meals, result, ingredients } = await computeAllocation(householdId, localToday(timezone))

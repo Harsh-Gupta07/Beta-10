@@ -38,6 +38,13 @@ pantryRouter.post('/pantry', async (req, res) => {
   res.status(201).json(await pantry.addPantryItem(householdId, userId, input))
 })
 
+// Adds stock that has physically arrived. A client-supplied idempotency key makes repeated clicks safe.
+pantryRouter.post('/pantry/receive', async (req, res) => {
+  const input = z.object({ ingredientId: z.string().min(1), quantity, unit: unit.optional(), note, idempotencyKey: z.string().uuid().optional() }).parse(req.body)
+  const { householdId, userId } = ctx(res)
+  res.status(201).json(await pantry.receiveStock(householdId, userId, input))
+})
+
 pantryRouter.patch('/pantry/:itemId', async (req, res) => {
   const input = z.object({
     quantity: quantity.optional(), unit: unit.optional(), lowStockThreshold: quantity.nullable().optional(),

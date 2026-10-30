@@ -16,5 +16,6 @@ export async function requireHouseholdMember(req: Request, res: Response, next: 
   const membership = await prisma.householdMember.findUnique({ where: { householdId_userId: { householdId, userId: req.session.userId } } })
   if (!membership) return res.status(404).json({ error: 'Household not found.' })
   res.locals.householdId = householdId
+  res.locals.role = membership.role
   next()
 }

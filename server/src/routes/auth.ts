@@ -43,6 +43,24 @@ authRouter.get('/me', requireUser, async (_req, res, next) => {
   } catch (error) { next(error) }
 })
 
+authRouter.patch('/me', requireUser, async (req, res, next) => {
+  try {
+    const input = z.object({ name: z.string().trim().min(1).max(80) }).parse(req.body)
+    const user = res.locals.user as { id: string }
+    res.json(await prisma.user.update({ where: { id: user.id }, data: input, select: { id: true, name: true, email: true } }))
+  } catch (error) { next(error) }
+})
+
+authRouter.post('/password', requireUser, async (req, res, next) => {
+  try {
+    const input = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(10).max(128) }).parse(req.body)
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: (res.locals.user as { id: string }).id } })
+    if (!(await bcrypt.compare(input.currentPassword, user.passwordHash))) return res.status(400).json({ error: 'Your current password is incorrect.' })
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(input.newPassword, 12) } })
+    res.status(204).end()
+  } catch (error) { next(error) }
+})
+
 authRouter.post('/logout', (req, res, next) => {
   req.session.destroy(error => {
     if (error) return next(error)

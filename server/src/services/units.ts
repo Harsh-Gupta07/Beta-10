@@ -58,6 +58,14 @@ export function scaleQuantity(quantity: Decimal, baseServings: number, servings:
   return unit === 'count' ? scaled.toDecimalPlaces(0, Decimal.ROUND_CEIL) : scaled.toDecimalPlaces(3, Decimal.ROUND_HALF_UP)
 }
 
+/** Human-readable quantity for messages, e.g. 1500 g -> "1.5 kg". Display only. */
+export function describeQuantity(quantity: Decimal | string, unit: string): string {
+  const value = new Decimal(quantity)
+  if (unit === 'count') return `${value.toString()} pcs`
+  if (value.abs().greaterThanOrEqualTo(1000)) return `${value.dividedBy(1000).toDecimalPlaces(2).toString()} ${unit === 'g' ? 'kg' : 'L'}`
+  return `${value.toDecimalPlaces(2).toString()} ${unit}`
+}
+
 export type StockStatus = 'OUT' | 'LOW' | 'OK'
 
 export function stockStatus(quantity: Decimal, lowStockThreshold: Decimal | null): StockStatus {

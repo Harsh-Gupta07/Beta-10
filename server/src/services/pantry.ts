@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { Prisma, type StockConfidence, type StockSource, type StockTransactionType } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { AppError, notFound } from '../lib/errors.js'
-import { expiryState, isCanonicalUnit, stockStatus, toCanonical, unitsFor, type CanonicalUnit, type InputUnit } from './units.js'
+import { expiryState, isCanonicalUnit, MAX_CANONICAL_QUANTITY, stockStatus, toCanonical, unitsFor, type CanonicalUnit, type InputUnit } from './units.js'
+import { notifyIfMealsAffected } from './notifications.js'
 
 type Tx = Prisma.TransactionClient
 type QuantityInput = { quantity: string | number; unit?: InputUnit }
@@ -147,7 +148,7 @@ export async function updatePantryItem(householdId: string, actorUserId: string,
 
 /** Records stock that was used outside a planned meal (spillage, snacks, unplanned cooking). */
 export async function recordUsage(householdId: string, actorUserId: string, itemId: string, input: QuantityInput & { note?: string }) {
-  return prisma.$transaction(async tx => {
+  const item = await prisma.$transaction(async tx => {
     const item = await lockItem(tx, householdId, itemId)
     const used = convert(input, canonicalOf(item.ingredient))
     if (used.isZero()) throw new AppError(400, 'Enter how much was used.')
@@ -159,6 +160,8 @@ export async function recordUsage(householdId: string, actorUserId: string, item
     const updated = await tx.pantryItem.update({ where: { id: item.id }, data: { quantity: balance }, include: itemInclude })
     return serializePantryItem(updated)
   })
+  const affected = await notifyIfMealsAffected(householdId, item.ingredient.id, `${item.ingredient.name} use was recorded`)
+  return { ...item, affected }
 }
 
 export type VerifyInput =
@@ -168,7 +171,7 @@ export type VerifyInput =
 
 /** A physical stock check. Always ends with CONFIRMED confidence and a fresh verification time. */
 export async function verifyPantryItem(householdId: string, actorUserId: string, itemId: string, input: VerifyInput) {
-  return prisma.$transaction(async tx => {
+  const result = await prisma.$transaction(async tx => {
     const item = await lockItem(tx, householdId, itemId)
     const newQuantity = input.action === 'confirm' ? item.quantity
       : input.action === 'finished' ? new Prisma.Decimal(0)
@@ -184,8 +187,49 @@ export async function verifyPantryItem(householdId: string, actorUserId: string,
       data: { quantity: newQuantity, confidence: 'CONFIRMED', lastVerifiedAt: new Date(), ...(changed ? { source: 'CORRECTION' as const } : {}) },
       include: itemInclude,
     })
-    return { item: serializePantryItem(updated), changed, previousQuantity: item.quantity.toString() }
+    return { item: serializePantryItem(updated), changed, decreased: newQuantity.lessThan(item.quantity), previousQuantity: item.quantity.toString() }
   })
+  // Recalculation is automatic (allocations are computed on read); tell the household if plans now fall short.
+  const affected = result.decreased ? await notifyIfMealsAffected(householdId, result.item.ingredient.id, `${result.item.ingredient.name} was corrected after a stock check`) : null
+  return { item: result.item, changed: result.changed, previousQuantity: result.previousQuantity, affected }
+}
+
+/**
+ * Adds stock that has physically arrived (a confirmed shopping receipt or a confirmed assistant action).
+ * This is the only path that increases stock outside manual edits. `idempotencyKey` is stored on the
+ * stock transaction, whose unique constraint makes a repeated receipt impossible.
+ */
+export async function receiveStockTx(tx: Tx, householdId: string, actorUserId: string, input: { ingredientId: string; quantity: Prisma.Decimal; idempotencyKey: string; note: string }) {
+  const ingredient = await tx.ingredient.findFirst({ where: { id: input.ingredientId, OR: [{ householdId: null }, { householdId }] } })
+  if (!ingredient) throw notFound('Ingredient')
+  if (!input.quantity.greaterThan(0)) throw new AppError(400, 'Received quantity must be more than zero.')
+  const now = new Date()
+  // Create the pantry row if it doesn't exist yet, without aborting the transaction on a concurrent insert.
+  await tx.$executeRaw`
+    INSERT INTO "PantryItem" ("id", "householdId", "ingredientId", "quantity", "unit", "confidence", "source", "purchasedAt", "lastVerifiedAt", "createdAt", "updatedAt")
+    VALUES (${randomUUID()}, ${householdId}, ${ingredient.id}, 0, ${ingredient.canonicalUnit}, 'CONFIRMED'::"StockConfidence", 'PURCHASE'::"StockSource", ${now}, ${now}, ${now}, ${now})
+    ON CONFLICT ("householdId", "ingredientId") DO NOTHING`
+  const existing = await tx.pantryItem.findUniqueOrThrow({ where: { householdId_ingredientId: { householdId, ingredientId: ingredient.id } }, select: { id: true } })
+  const item = await lockItem(tx, householdId, existing.id)
+  const balance = item.quantity.plus(input.quantity)
+  if (balance.greaterThan(MAX_CANONICAL_QUANTITY)) throw new AppError(400, 'That quantity is too large.')
+  await tx.stockTransaction.create({
+    data: { idempotencyKey: input.idempotencyKey, householdId, pantryItemId: item.id, ingredientId: item.ingredientId, actorUserId, type: 'PURCHASE_RECEIVED', delta: input.quantity, balanceAfter: balance, unit: item.unit, note: input.note },
+  })
+  const updated = await tx.pantryItem.update({ where: { id: item.id }, data: { quantity: balance, source: 'PURCHASE', purchasedAt: now }, include: itemInclude })
+  return serializePantryItem(updated)
+}
+
+export async function receiveStock(householdId: string, actorUserId: string, input: QuantityInput & { ingredientId: string; note?: string; idempotencyKey?: string }) {
+  const ingredient = await prisma.ingredient.findFirst({ where: { id: input.ingredientId, OR: [{ householdId: null }, { householdId }] } })
+  if (!ingredient) throw notFound('Ingredient')
+  const quantity = convert(input, canonicalOf(ingredient))
+  try {
+    return await prisma.$transaction(tx => receiveStockTx(tx, householdId, actorUserId, { ingredientId: ingredient.id, quantity, idempotencyKey: input.idempotencyKey ?? randomUUID(), note: input.note || 'Stock added' }))
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new AppError(409, 'This stock was already added.')
+    throw error
+  }
 }
 
 export async function deletePantryItem(householdId: string, actorUserId: string, itemId: string) {
