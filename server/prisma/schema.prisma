@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum HouseholdRole {
+  OWNER
+  MEMBER
+}
+
+enum StockConfidence {
+  CONFIRMED
+  ESTIMATED
+  CHECK_NEEDED
+}
+
+enum StockSource {
+  MANUAL
+  PURCHASE
+  RECIPE_DEDUCTION
+  CORRECTION
+  IMPORT
+}
+
+enum MealSlot {
+  BREAKFAST
+  LUNCH
+  DINNER
+}
+
+enum MealStatus {
+  PLANNED
+  COOKING
+  COMPLETED
+  CANCELLED
+}
+
+enum StockTransactionType {
+  INITIAL_STOCK
+  PURCHASE_RECEIVED
+  COOKING_CONSUMPTION
+  CORRECTION
+  MANUAL_USE
+  REMOVED
+}
+
+enum ShoppingItemStatus {
+  NEEDED
+  PURCHASED
+  RECEIVED
+}
+
+/// express-session storage used by connect-pg-simple. Declared here so migrations own it.
+model Session {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+  @@index([expire], map: "IDX_session_expire")
+  @@map("session")
+}
+
+model User {
+  id           String            @id @default(cuid())
+  name         String
+  email        String            @unique
+  passwordHash String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  memberships  HouseholdMember[]
+  transactions StockTransaction[]
+  verifications InventoryVerification[]
+}
+
+model Household {
+  id               String            @id @default(cuid())
+  name             String
+  defaultServings  Int               @default(3)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  members          HouseholdMember[]
+  ingredients      Ingredient[]
+  pantryItems      PantryItem[]
+  recipes          Recipe[]
+  mealPlans        MealPlan[]
+  stockTransactions StockTransaction[]
+  shoppingLists    ShoppingList[]
+  verifications    InventoryVerification[]
+  notifications    Notification[]
+}
+
+model HouseholdMember {
+  id          String        @id @default(cuid())
+  householdId String
+  userId      String
+  role        HouseholdRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+  household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([householdId, userId])
+  @@index([userId])
+}
+
+/// Global catalog entries have householdId = null; custom entries belong to one household.
+/// nameKey is the trimmed, lower-cased name used for duplicate detection.
+model Ingredient {
+  id             String               @id @default(cuid())
+  householdId    String?
+  name           String
+  nameKey        String
+  category       String               @default("Other")
+  /// One of g, ml, count. Pantry and recipe quantities are stored in this unit.
+  canonicalUnit  String
+  household      Household?           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  pantryItems    PantryItem[]
+  recipeLines    RecipeIngredient[]
+  allocations    MealIngredientAllocation[]
+  shoppingItems  ShoppingListItem[]
+  stockTransactions StockTransaction[]
+  @@unique([householdId, nameKey])
+  @@index([nameKey])
+}
+
+model PantryItem {
+  id                String          @id @default(cuid())
+  householdId       String
+  ingredientId      String
+  quantity          Decimal         @db.Decimal(12, 3)
+  unit              String
+  lowStockThreshold Decimal?        @db.Decimal(12, 3)
+  confidence        StockConfidence @default(ESTIMATED)
+  source            StockSource     @default(MANUAL)
+  purchasedAt       DateTime?
+  expiresAt         DateTime?
+  lastVerifiedAt    DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  household         Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  ingredient        Ingredient      @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  transactions      StockTransaction[]
+  verifications     InventoryVerification[]
+  @@unique([householdId, ingredientId])
+  @@index([householdId, confidence])
+}
+
+model Recipe {
+  id           String             @id @default(cuid())
+  householdId  String?
+  name         String
+  description  String             @default("")
+  category     String             @default("Other")
+  baseServings Int                @default(4)
+  prepMinutes  Int                @default(30)
+  instructions String[]
+  isShared     Boolean            @default(false)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  household    Household?         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  ingredients  RecipeIngredient[]
+  plannedMeals PlannedMeal[]
+  @@index([householdId, name])
+}
+
+model RecipeIngredient {
+  id           String     @id @default(cuid())
+  recipeId     String
+  ingredientId String
+  quantity     Decimal    @db.Decimal(12, 3)
+  unit         String
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  @@unique([recipeId, ingredientId])
+}
+
+model MealPlan {
+  id          String        @id @default(cuid())
+  householdId String
+  weekStart   DateTime      @db.Date
+  createdAt   DateTime      @default(now())
+  household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  meals       PlannedMeal[]
+  @@unique([householdId, weekStart])
+}
+
+model PlannedMeal {
+  id          String                    @id @default(cuid())
+  mealPlanId  String
+  recipeId    String
+  date        DateTime                  @db.Date
+  slot        MealSlot
+  servings    Int
+  status      MealStatus                @default(PLANNED)
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  mealPlan    MealPlan                  @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipe      Recipe                    @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  allocations MealIngredientAllocation[]
+  cookingEvent CookingEvent?
+  @@unique([mealPlanId, date, slot])
+  @@index([date, status])
+}
+
+model MealIngredientAllocation {
+  id            String       @id @default(cuid())
+  plannedMealId String
+  ingredientId  String
+  quantity      Decimal      @db.Decimal(12, 3)
+  unit          String
+  plannedMeal   PlannedMeal  @relation(fields: [plannedMealId], references: [id], onDelete: Cascade)
+  ingredient    Ingredient   @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  @@unique([plannedMealId, ingredientId])
+  @@index([ingredientId])
+}
+
+model CookingEvent {
+  id             String      @id @default(cuid())
+  plannedMealId  String      @unique
+  idempotencyKey String      @unique
+  completedAt    DateTime    @default(now())
+  plannedMeal    PlannedMeal @relation(fields: [plannedMealId], references: [id], onDelete: Restrict)
+  transactions   StockTransaction[]
+}
+
+model StockTransaction {
+  id             String                @id @default(cuid())
+  idempotencyKey String                @unique
+  householdId    String
+  /// Null once the pantry item is deleted; ingredientId keeps the history readable.
+  pantryItemId   String?
+  ingredientId   String
+  actorUserId    String
+  cookingEventId String?
+  type           StockTransactionType
+  delta          Decimal               @db.Decimal(12, 3)
+  balanceAfter   Decimal               @db.Decimal(12, 3)
+  unit           String
+  note           String                @default("")
+  createdAt      DateTime              @default(now())
+  household      Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  pantryItem     PantryItem?           @relation(fields: [pantryItemId], references: [id], onDelete: SetNull)
+  ingredient     Ingredient            @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  actor          User                  @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  cookingEvent   CookingEvent?         @relation(fields: [cookingEventId], references: [id], onDelete: SetNull)
+  @@index([householdId, createdAt])
+  @@index([pantryItemId, createdAt])
+}
+
+model ShoppingList {
+  id          String             @id @default(cuid())
+  householdId String
+  name        String             @default("Weekly shopping")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  household   Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items       ShoppingListItem[]
+  @@unique([householdId, name])
+}
+
+model ShoppingListItem {
+  id             String             @id @default(cuid())
+  shoppingListId String
+  ingredientId   String?
+  name           String
+  quantity       Decimal            @db.Decimal(12, 3)
+  unit           String             @default("item")
+  status         ShoppingItemStatus @default(NEEDED)
+  receivedQty    Decimal?           @db.Decimal(12, 3)
+  updatedAt      DateTime           @updatedAt
+  shoppingList   ShoppingList       @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  ingredient     Ingredient?        @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  @@index([shoppingListId, status])
+}
+
+model InventoryVerification {
+  id          String      @id @default(cuid())
+  householdId String
+  pantryItemId String?
+  actorUserId String
+  oldQuantity Decimal     @db.Decimal(12, 3)
+  newQuantity Decimal     @db.Decimal(12, 3)
+  unit        String
+  note        String      @default("")
+  verifiedAt  DateTime    @default(now())
+  household   Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  pantryItem  PantryItem? @relation(fields: [pantryItemId], references: [id], onDelete: SetNull)
+  actor       User        @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  @@index([householdId, verifiedAt])
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  householdId String
+  title       String
+  body        String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  @@index([householdId, readAt, createdAt])
+}
