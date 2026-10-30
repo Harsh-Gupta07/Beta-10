@@ -11,7 +11,10 @@ import { PantryPage } from './features/pantry/PantryPage'
 import { RecipesPage } from './features/recipes/RecipesPage'
 import { RecipeDetailPage } from './features/recipes/RecipeDetailPage'
 import { PlannerPage } from './features/planner/PlannerPage'
-import { ComingSoon } from './features/ComingSoon'
+import { ShoppingPage } from './features/shopping/ShoppingPage'
+import { VerifyPage } from './features/verification/VerifyPage'
+import { AssistantPage } from './features/assistant/AssistantPage'
+import { SettingsPage } from './features/settings/SettingsPage'
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -48,13 +51,14 @@ function App() {
     <AppShell>
       <Routes>
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/pantry" element={<PantryPage />} />
         <Route path="/planner" element={<PlannerPage />} />
         <Route path="/recipes" element={<RecipesPage />} />
         <Route path="/recipes/:recipeId" element={<RecipeDetailPage />} />
-        <Route path="/shopping" element={<ComingSoon title="Shopping List" milestone="Missing ingredients collected into one list. Stock only increases when you confirm what was actually received." />} />
-        <Route path="/assistant" element={<ComingSoon title="AI Assistant" milestone="Ask what you can cook, add stock in plain language, or get shortages explained. The core app keeps working without it." />} />
-        <Route path="/settings" element={<ComingSoon title="Household & Settings" milestone="Manage your household name, default servings and members, and invite family to share the same kitchen." />} />
+        <Route path="/pantry" element={<PantryPage />} />
+        <Route path="/verify" element={<VerifyPage />} />
+        <Route path="/shopping" element={<ShoppingPage />} />
+        <Route path="/assistant" element={<AssistantPage />} />
+        <Route path="/settings" element={<SettingsPage onSessionChange={refresh} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>

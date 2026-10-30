@@ -129,4 +129,44 @@ export type Dashboard = {
   shortages: Shortage[]
   shoppingCount: number
   activity: StockTransaction[]
+  unreadNotifications: number
 }
+
+export type CookingView = {
+  id: string; status: MealStatus; servings: number; slot: MealSlot; date: string
+  cookingStartedAt: string | null; completedAt: string | null
+  recipe: { id: string; name: string; instructions: string[] }
+  lines: Array<{ ingredient: { id: string; name: string }; unit: CanonicalUnit; note: string; planned: string; inPantry: string | null; used: string | null }>
+}
+
+export type ShoppingItem = {
+  id: string; name: string; category: string
+  ingredient: { id: string; name: string; category: string; canonicalUnit: CanonicalUnit } | null
+  quantity: string; unit: string; status: 'NEEDED' | 'PURCHASED' | 'RECEIVED'; source: 'MANUAL' | 'SHORTAGE' | 'ASSISTANT'; note: string
+  receivedQty: string | null; purchasedAt: string | null; receivedAt: string | null; createdAt: string
+}
+export type ShoppingSuggestion = {
+  ingredient: { id: string; name: string; category: string }; unit: CanonicalUnit
+  shortage: string; onList: string; suggested: string; affectedMeals: number; firstAffected: Shortage['firstAffected']
+}
+export type ShoppingData = { items: ShoppingItem[]; suggestions: ShoppingSuggestion[] }
+
+export type VerificationEntry = { item: PantryItem; reasons: string[]; score: number; neededBy: number; priority: 'HIGH' | 'MEDIUM' | 'LOW' }
+
+export type AppNotification = { id: string; title: string; body: string; link: string | null; readAt: string | null; createdAt: string }
+
+export type HouseholdDetails = Household & {
+  timezone: string; inviteCode: string | null; createdAt: string; yourRole: 'OWNER' | 'MEMBER'
+  members: Array<User & { role: 'OWNER' | 'MEMBER'; joinedAt: string }>
+}
+
+export type RecipeDraft = {
+  name: string; category: string; description: string; baseServings: number; prepMinutes: number; cookMinutes: number; instructions: string[]
+  ingredients: Array<{ ingredientId: string; ingredientName: string; quantity: string; unit: InputUnit; note: string }>
+  unresolved: string[]
+}
+export type AssistantAction =
+  | { id: string; type: 'ADD_STOCK'; ingredientId: string; ingredientName: string; quantity: string; unit: InputUnit; summary: string }
+  | { id: string; type: 'ADD_TO_SHOPPING'; items: Array<{ ingredientId: string; ingredientName: string; quantity: string; unit: InputUnit }>; summary: string }
+  | { id: string; type: 'RECIPE_DRAFT'; draft: RecipeDraft; summary: string }
+export type AssistantReply = { mode: 'ai' | 'fallback'; reply: string; actions: AssistantAction[] }

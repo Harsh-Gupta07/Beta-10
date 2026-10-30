@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, BookOpen, CalendarCheck, CalendarDays, ClipboardCheck, PackageCheck, Plus, TriangleAlert } from 'lucide-react'
+import { Activity, BookOpen, CalendarCheck, CalendarDays, ClipboardCheck, PackageCheck, Plus, ShoppingCart, Sparkles, TriangleAlert } from 'lucide-react'
 import { api, errorMessage, type Dashboard } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatDay, formatDelta, formatQuantity, relativeDay, relativeTime, slotLabel, statusLabel, transactionLabel } from '../../lib/format'
@@ -35,7 +35,9 @@ export function DashboardPage() {
 
       <section className="quick-actions" aria-label="Quick actions">
         <Link to="/pantry?add=1"><Plus size={16} aria-hidden />Add ingredient</Link>
-        <Link to="/pantry?view=check"><ClipboardCheck size={16} aria-hidden />Verify stock</Link>
+        <Link to="/verify"><ClipboardCheck size={16} aria-hidden />Verify stock</Link>
+        <Link to="/shopping"><ShoppingCart size={16} aria-hidden />Shopping list{data.shoppingCount > 0 && <small>{data.shoppingCount}</small>}</Link>
+        <Link to="/assistant"><Sparkles size={16} aria-hidden />Ask the assistant</Link>
         <Link to="/recipes?new=1"><BookOpen size={16} aria-hidden />Add recipe</Link>
         <Link to="/planner"><CalendarDays size={16} aria-hidden />Plan a meal</Link>
       </section>
@@ -86,7 +88,7 @@ export function DashboardPage() {
       </article>
       </section>
 
-      {data.needsCheck > 0 && <Link to="/pantry?view=check" className="callout warning"><TriangleAlert size={18} aria-hidden /><span><strong>{data.needsCheck} item{data.needsCheck === 1 ? '' : 's'} need a quick check.</strong> A 10-second look keeps your plans accurate.</span></Link>}
+      {data.needsCheck > 0 && <Link to="/verify" className="callout warning"><TriangleAlert size={18} aria-hidden /><span><strong>{data.needsCheck} item{data.needsCheck === 1 ? '' : 's'} need a quick check.</strong> A 10-second look keeps your plans accurate.</span></Link>}
     </>}
   </>
 }

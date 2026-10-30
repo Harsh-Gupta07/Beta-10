@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { ChevronRight, Plus, Refrigerator, Search, SearchX } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ChevronRight, ClipboardCheck, Plus, Refrigerator, Search, SearchX } from 'lucide-react'
 import { api, errorMessage, type PantryItem } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatQuantity, relativeTime } from '../../lib/format'
@@ -44,7 +44,7 @@ export function PantryPage() {
 
   return <>
     <PageHeader eyebrow="PANTRY" title="Kitchen inventory" description="What’s physically in your kitchen. Planned meals never reduce these amounts; only cooking and recorded use do."
-      actions={<button className="primary-button" onClick={() => setParam('add', '1')}><Plus size={16} aria-hidden />Add item</button>} />
+      actions={<><Link className="ghost-button" to="/verify"><ClipboardCheck size={15} aria-hidden />Quick stock check</Link><button className="primary-button" onClick={() => setParam('add', '1')}><Plus size={16} aria-hidden />Add item</button></>} />
 
     {error && <Notice onRetry={load}>{error}</Notice>}
     {items === null && !error && <Spinner label="Loading pantry…" />}

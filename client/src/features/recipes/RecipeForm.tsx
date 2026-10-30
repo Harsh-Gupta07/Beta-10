@@ -1,29 +1,34 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Plus, X } from 'lucide-react'
-import { api, errorMessage, type Ingredient, type InputUnit, type RecipeDetail } from '../../lib/api'
+import { api, errorMessage, type Ingredient, type InputUnit, type RecipeDetail, type RecipeDraft } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { baseUnit, unitOptions } from '../../lib/format'
 import { Field, Modal, Notice, Spinner } from '../../components/ui'
 
 type Line = { key: number; ingredientId: string; quantity: string; unit: InputUnit; note: string }
-type Props = { recipe?: RecipeDetail; categories: string[]; onClose: () => void; onSaved: (recipe: RecipeDetail) => void }
+type Props = { recipe?: RecipeDetail; draft?: RecipeDraft; categories: string[]; onClose: () => void; onSaved: (recipe: RecipeDetail) => void }
 
 let nextKey = 1
 const blankLine = (): Line => ({ key: nextKey++, ingredientId: '', quantity: '', unit: 'g', note: '' })
 
-/** Create a recipe, or edit a household-owned one. `recipe` must be fetched at its base servings. */
-export function RecipeForm({ recipe, categories, onClose, onSaved }: Props) {
+/**
+ * Create a recipe, edit a household-owned one (`recipe`, fetched at its base servings),
+ * or review an assistant draft (`draft`) before saving it as a new recipe.
+ */
+export function RecipeForm({ recipe, draft, categories, onClose, onSaved }: Props) {
   const { household } = useSession()
   const [catalog, setCatalog] = useState<Ingredient[] | null>(null)
-  const [name, setName] = useState(recipe?.name ?? '')
-  const [category, setCategory] = useState(recipe?.category ?? '')
-  const [description, setDescription] = useState(recipe?.description ?? '')
-  const [baseServings, setBaseServings] = useState(String(recipe?.baseServings ?? household.defaultServings))
-  const [prepMinutes, setPrepMinutes] = useState(String(recipe?.prepMinutes ?? 15))
-  const [cookMinutes, setCookMinutes] = useState(String(recipe?.cookMinutes ?? 20))
-  const [steps, setSteps] = useState(recipe?.instructions.join('\n') ?? '')
+  const source = recipe ?? draft
+  const [name, setName] = useState(source?.name ?? '')
+  const [category, setCategory] = useState(source?.category ?? '')
+  const [description, setDescription] = useState(source?.description ?? '')
+  const [baseServings, setBaseServings] = useState(String(source?.baseServings ?? household.defaultServings))
+  const [prepMinutes, setPrepMinutes] = useState(String(source?.prepMinutes ?? 15))
+  const [cookMinutes, setCookMinutes] = useState(String(source?.cookMinutes ?? 20))
+  const [steps, setSteps] = useState(source?.instructions.join('\n') ?? '')
   const [lines, setLines] = useState<Line[]>(() => recipe
     ? recipe.ingredients.map(l => ({ key: nextKey++, ingredientId: l.ingredient.id, quantity: l.quantity, unit: baseUnit[l.unit], note: l.note }))
+    : draft?.ingredients.length ? draft.ingredients.map(l => ({ key: nextKey++, ingredientId: l.ingredientId, quantity: l.quantity, unit: l.unit, note: l.note }))
     : [blankLine(), blankLine(), blankLine()])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -65,9 +70,10 @@ export function RecipeForm({ recipe, categories, onClose, onSaved }: Props) {
   }
 
   const chosen = new Set(lines.map(l => l.ingredientId).filter(Boolean))
-  return <Modal wide title={recipe ? `Edit ${recipe.name}` : 'New recipe'} subtitle="Quantities are for the number of servings below and scale automatically." onClose={onClose}
+  return <Modal wide title={recipe ? `Edit ${recipe.name}` : draft ? 'Review AI recipe draft' : 'New recipe'} subtitle={draft ? 'Check every quantity and step before saving. Nothing is saved until you press Create.' : 'Quantities are for the number of servings below and scale automatically.'} onClose={onClose}
     footer={<><button type="button" className="ghost-button" onClick={onClose}>Cancel</button><button form="recipe-form" className="primary-button" disabled={busy || !catalog}>{busy ? 'Saving…' : recipe ? 'Save recipe' : 'Create recipe'}</button></>}>
     {error && <Notice>{error}</Notice>}
+    {draft && draft.unresolved.length > 0 && <Notice tone="warning">Not in your ingredient catalog, so not added: {draft.unresolved.join(', ')}. Add them as custom ingredients in the Pantry if you need them.</Notice>}
     <form id="recipe-form" className="form-grid" onSubmit={submit}>
       <div className="full"><Field label="Recipe name"><input value={name} onChange={e => setName(e.target.value)} required minLength={2} maxLength={80} placeholder="e.g. Sambar" /></Field></div>
       <Field label="Category">

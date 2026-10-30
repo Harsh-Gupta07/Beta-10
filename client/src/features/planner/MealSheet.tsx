@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRightLeft, BookOpen, CircleX, Repeat } from 'lucide-react'
+import { ArrowRightLeft, BookOpen, ChefHat, CircleX, Repeat } from 'lucide-react'
 import { api, errorMessage, type MealSlot, type PlannedMeal, type RecipeSummary } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatDay, formatQuantity, slotLabel, slots, statusLabel } from '../../lib/format'
@@ -8,11 +8,11 @@ import { Badge, Modal, Notice } from '../../components/ui'
 import { RecipePicker } from './RecipePicker'
 import { ServingsStepper } from './AddMealDialog'
 
-type Props = { meal: PlannedMeal; today: string; recipes: RecipeSummary[]; onClose: () => void; onChanged: () => Promise<void> }
+type Props = { meal: PlannedMeal; today: string; recipes: RecipeSummary[]; onClose: () => void; onChanged: () => Promise<void>; onCook: () => void }
 
 const statusTone = { PLANNED: 'blue', COOKING: 'amber', COMPLETED: 'green', CANCELLED: 'grey' } as const
 
-export function MealSheet({ meal, today, recipes, onClose, onChanged }: Props) {
+export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: Props) {
   const { household } = useSession()
   const editable = meal.status === 'PLANNED' && !meal.isPast
   const [mode, setMode] = useState<'idle' | 'recipe' | 'move' | 'cancel'>('idle')
@@ -36,7 +36,9 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged }: Props) {
     footer={mode === 'cancel'
       ? <><span className="confirm-text">Cancel this meal? Its reserved stock is released.</span><button className="ghost-button" onClick={() => setMode('idle')}>Keep it</button><button className="danger-button" disabled={busy} onClick={() => run(() => api.post(`${path}/cancel`))}>{busy ? 'Cancelling…' : 'Cancel meal'}</button></>
       : <><Link className="ghost-button" to={`/recipes/${meal.recipe.id}`}><BookOpen size={15} aria-hidden />View recipe</Link>
-          {editable && <button className="ghost-button danger-text" onClick={() => setMode('cancel')}><CircleX size={15} aria-hidden />Cancel meal</button>}</>}>
+          {editable && <button className="ghost-button danger-text" onClick={() => setMode('cancel')}><CircleX size={15} aria-hidden />Cancel meal</button>}
+          {(meal.status === 'PLANNED' || meal.status === 'COOKING') && <button className="primary-button" onClick={onCook}><ChefHat size={15} aria-hidden />{meal.status === 'COOKING' ? 'Continue cooking' : 'Cook'}</button>}
+          {meal.status === 'COMPLETED' && <button className="secondary-button" onClick={onCook}><ChefHat size={15} aria-hidden />See what was used</button>}</>}>
     {error && <Notice>{error}</Notice>}
 
     {editable && <div className="sheet-toolbar">

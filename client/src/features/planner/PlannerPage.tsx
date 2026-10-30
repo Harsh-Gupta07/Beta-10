@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { CalendarCheck, ChevronLeft, ChevronRight, Plus, TriangleAlert } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { CalendarCheck, ChevronLeft, ChevronRight, Plus, ShoppingCart, TriangleAlert } from 'lucide-react'
 import { api, errorMessage, type MealSlot, type PlannedMeal, type PlannerWeek, type RecipeSummary } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { addDays, formatDay, slotLabel, slots, statusLabel } from '../../lib/format'
@@ -8,6 +8,7 @@ import { Badge, Notice, PageHeader, Spinner } from '../../components/ui'
 import { AddMealDialog } from './AddMealDialog'
 import { MealSheet } from './MealSheet'
 import { ShortageList } from './ShortageList'
+import { CookingDialog } from '../cooking/CookingDialog'
 
 export function PlannerPage() {
   const { household } = useSession()
@@ -19,6 +20,8 @@ export function PlannerPage() {
   const [adding, setAdding] = useState<{ date: string; slot: MealSlot } | null>(null)
   const [openMealId, setOpenMealId] = useState<string | null>(null)
   const [showAllShortages, setShowAllShortages] = useState(false)
+  const [cookingMealId, setCookingMealId] = useState<string | null>(null)
+  const [shoppingNote, setShoppingNote] = useState('')
 
   const load = useCallback(async () => {
     setError('')
@@ -69,7 +72,13 @@ export function PlannerPage() {
             <div className="panel-heading"><div><p className="eyebrow">UPCOMING SHORTAGES</p><h2><TriangleAlert size={17} aria-hidden className="inline-icon warn" />{data.shortages.length} ingredient{data.shortages.length === 1 ? '' : 's'} will run short</h2></div>
               {data.shortages.length > 4 && <button className="link-button" onClick={() => setShowAllShortages(!showAllShortages)}>{showAllShortages ? 'Show fewer' : `Show all ${data.shortages.length}`}</button>}</div>
             <ShortageList shortages={data.shortages} today={data.today} limit={showAllShortages ? undefined : 4} onSelectMeal={selectMeal} />
-            <p className="muted small">Shopping-list hand-off arrives with the Shopping milestone. For now, add stock in the Pantry and shortages update instantly.</p>
+            <div className="panel-actions">
+              <button className="secondary-button" onClick={async () => {
+                try { const { data } = await api.post<{ added: number }>(`/households/${household.id}/shopping/add-shortages`, {}); setShoppingNote(data.added ? `Added ${data.added} item${data.added === 1 ? '' : 's'} to your shopping list.` : 'Everything short is already on your shopping list.') }
+                catch (err) { setShoppingNote(errorMessage(err)) }
+              }}><ShoppingCart size={15} aria-hidden />Add shortages to shopping list</button>
+              {shoppingNote && <span className="muted small">{shoppingNote} <Link to="/shopping">Open list</Link></span>}
+            </div>
           </section>
         : planned > 0 && <div className="callout success"><CalendarCheck size={18} aria-hidden /><span>Your pantry covers every upcoming planned meal.</span></div>}
 
@@ -100,6 +109,7 @@ export function PlannerPage() {
     </>}
 
     {adding && data && <AddMealDialog date={adding.date} slot={adding.slot} recipes={recipes} defaultServings={data.defaultServings} onClose={() => setAdding(null)} onAdded={() => { setAdding(null); void load() }} />}
-    {openMeal && data && <MealSheet key={openMeal.id + openMeal.status + openMeal.servings + openMeal.recipe.id + openMeal.date + openMeal.slot} meal={openMeal} today={data.today} recipes={recipes} onClose={() => setOpenMealId(null)} onChanged={load} />}
+    {openMeal && data && !cookingMealId && <MealSheet key={openMeal.id + openMeal.status + openMeal.servings + openMeal.recipe.id + openMeal.date + openMeal.slot} meal={openMeal} today={data.today} recipes={recipes} onClose={() => setOpenMealId(null)} onChanged={load} onCook={() => setCookingMealId(openMeal.id)} />}
+    {cookingMealId && <CookingDialog mealId={cookingMealId} onClose={() => setCookingMealId(null)} onChanged={() => void load()} />}
   </>
 }
