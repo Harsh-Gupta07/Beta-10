@@ -45,7 +45,10 @@ householdRouter.get('/:householdId', requireHouseholdMember, async (_req, res) =
 householdRouter.patch('/:householdId', requireHouseholdMember, async (req, res) => {
   const input = z.object({ name: z.string().trim().min(2).max(80).optional(), defaultServings: z.coerce.number().int().min(1).max(20).optional(), timezone: z.string().trim().max(64).optional(),
     appliances: z.array(z.enum(['GAS_STOVE', 'INDUCTION', 'MICROWAVE', 'AIR_FRYER', 'OVEN', 'PRESSURE_COOKER', 'MIXER_GRINDER'])).max(7).optional(),
-    usualCookMinutes: z.coerce.number().int().min(5).max(240).nullable().optional() }).parse(req.body)
+    usualCookMinutes: z.coerce.number().int().min(5).max(240).nullable().optional(),
+    katoriMl: z.coerce.number().int().min(50).max(500).nullable().optional(),
+    chammachMl: z.coerce.number().int().min(2).max(30).nullable().optional(),
+    mutthiGrams: z.coerce.number().int().min(10).max(150).nullable().optional() }).parse(req.body)
   res.json(await households.updateHousehold(hid(res), role(res), input))
 })
 

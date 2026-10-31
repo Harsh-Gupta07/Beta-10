@@ -7,15 +7,18 @@ import { Badge, Notice, Segmented, Spinner } from '../../components/ui'
 import { PersonFields, emptyNeeds } from './PersonFields'
 import { KitchenFields, type KitchenSetup } from './KitchenFields'
 import { RolesEditor } from './RolesEditor'
+import { LanguageFields, type LanguageSetup } from './LanguageFields'
+import { DEFAULT_MEASURES } from '../../lib/measures'
 
 type Props = { user: User; household: Household | null; onChanged: () => Promise<void>; onSignOut: () => Promise<void> }
 
-const STEPS = ['Your household', 'Who eats at home', 'Your kitchen', 'Who does what']
+const STEPS = ['Your household', 'Who eats at home', 'Your kitchen', 'Who does what', 'Language & measures']
+const STAGES = ['people', 'kitchen', 'roles', 'language'] as const
 
-/** First-time setup as short conversational cards. A language card is added in a later slice. */
+/** First-time setup as short conversational cards. */
 export function Onboarding({ user, household, onChanged, onSignOut }: Props) {
-  const [stage, setStage] = useState<'people' | 'kitchen' | 'roles'>('people')
-  const step = !household ? 1 : stage === 'people' ? 2 : stage === 'kitchen' ? 3 : 4
+  const [stage, setStage] = useState<(typeof STAGES)[number]>('people')
+  const step = !household ? 1 : STAGES.indexOf(stage) + 2
   async function finish() {
     await api.post(`/households/${household!.id}/onboarding/complete`)
     await onChanged()
@@ -30,7 +33,8 @@ export function Onboarding({ user, household, onChanged, onSignOut }: Props) {
       </ol>
     </header>
     {!household ? <HouseholdStep user={user} onCreated={onChanged} />
-      : stage === 'roles' ? <RolesStep user={user} household={household} onBack={() => setStage('kitchen')} onFinish={finish} />
+      : stage === 'language' ? <LanguageStep user={user} household={household} onBack={() => setStage('roles')} onFinish={finish} />
+      : stage === 'roles' ? <RolesStep user={user} household={household} onBack={() => setStage('kitchen')} onNext={() => setStage('language')} />
       : stage === 'kitchen' ? <KitchenStep household={household} onBack={() => setStage('people')} onNext={() => setStage('roles')} />
       : <PeopleStep user={user} household={household} onNext={() => setStage('kitchen')} />}
     <p className="switch-auth">Signed in as {user.email}. <button type="button" onClick={() => void onSignOut()}>Sign out</button></p>
@@ -109,23 +113,48 @@ function KitchenStep({ household, onBack, onNext }: { household: Household; onBa
   </section>
 }
 
-function RolesStep({ user, household, onBack, onFinish }: { user: User; household: Household; onBack: () => void; onFinish: () => Promise<void> }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  async function finish() {
-    setBusy(true); setError('')
-    try { await onFinish() } catch (err) { setError(errorMessage(err)); setBusy(false) }
-  }
+function RolesStep({ user, household, onBack, onNext }: { user: User; household: Household; onBack: () => void; onNext: () => void }) {
   return <section className="onboarding-card wide">
     <p className="eyebrow">STEP 4</p>
     <h1>Who does what in your kitchen?</h1>
     <p className="muted">Each person then sees their own jobs first: the cook sees today’s meals, the shopper the list, the checker the stock check. Everyone can still use everything.</p>
+    <RolesEditor householdId={household.id} userId={user.id} owner saveLabel="Save and continue" onSaved={onNext} />
+    <div className="onboarding-actions">
+      <button type="button" className="ghost-button" onClick={onBack}>Back</button>
+      <span className="toolbar-spacer" />
+      <button type="button" className="ghost-button" onClick={onNext}>Skip this step</button>
+    </div>
+  </section>
+}
+
+function LanguageStep({ user, household, onBack, onFinish }: { user: User; household: Household; onBack: () => void; onFinish: () => Promise<void> }) {
+  const [setup, setSetup] = useState<LanguageSetup>({
+    language: user.language ?? "EN", voiceLanguage: user.voiceLanguage ?? "en-IN",
+    katoriMl: household.katoriMl ?? DEFAULT_MEASURES.katoriMl, chammachMl: household.chammachMl ?? DEFAULT_MEASURES.chammachMl, mutthiGrams: household.mutthiGrams ?? DEFAULT_MEASURES.mutthiGrams,
+  })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState("")
+  async function done(save: boolean) {
+    setBusy(true); setError("")
+    try {
+      if (save) {
+        await api.patch("/auth/me", { language: setup.language, voiceLanguage: setup.voiceLanguage })
+        await api.patch(`/households/${household.id}`, { katoriMl: setup.katoriMl, chammachMl: setup.chammachMl, mutthiGrams: setup.mutthiGrams })
+      }
+      await onFinish()
+    } catch (err) { setError(errorMessage(err, "Could not save your language and measures.")); setBusy(false) }
+  }
+  return <section className="onboarding-card wide">
+    <p className="eyebrow">STEP 5</p>
+    <h1>Your language and measures</h1>
+    <p className="muted">Talk to KitchenSync the way you talk at home, and add stock in katori, chammach or mutthi.</p>
     {error && <Notice>{error}</Notice>}
-    <RolesEditor householdId={household.id} userId={user.id} owner saveLabel={busy ? 'Finishing…' : 'Save and finish setup'} onSaved={finish} />
+    <LanguageFields value={setup} onChange={setSetup} />
     <div className="onboarding-actions">
       <button type="button" className="ghost-button" onClick={onBack} disabled={busy}>Back</button>
       <span className="toolbar-spacer" />
-      <button type="button" className="ghost-button" onClick={finish} disabled={busy}>Skip for now</button>
+      <button type="button" className="ghost-button" onClick={() => done(false)} disabled={busy}>Skip for now</button>
+      <button type="button" className="primary-button" onClick={() => done(true)} disabled={busy}>{busy ? "Finishing…" : "Finish setup"}</button>
     </div>
   </section>
 }

@@ -5,6 +5,7 @@ import { useSession } from '../../lib/session'
 import { baseUnit, toDateInput, unitOptions } from '../../lib/format'
 import { Field, Modal, Notice, Segmented, Spinner } from '../../components/ui'
 import { FoodTagFields, untagged, type FoodTags } from './FoodTagFields'
+import { convertHomeUnit, HOME_UNIT_LABEL, homeUnitsFor, type HomeUnit } from '../../lib/measures'
 
 const confidenceOptions: Array<{ value: Confidence; label: string }> = [
   { value: 'CONFIRMED', label: 'Confirmed' }, { value: 'ESTIMATED', label: 'Estimated' }, { value: 'CHECK_NEEDED', label: 'Check needed' },
@@ -42,6 +43,12 @@ export function PantryItemForm({ item, existingIngredientIds, onClose, onSaved }
   // Keep the unit valid for the chosen ingredient's measurement family.
   useEffect(() => { if (!unitOptions[family].includes(unit)) setUnit(baseUnit[family]) }, [family, unit])
 
+  // The household's own measures (katori, chammach, mutthi), when they suit this ingredient.
+  const [homeUnit, setHomeUnit] = useState<HomeUnit | ''>('')
+  const homeUnits = homeUnitsFor(family, household)
+  const home = homeUnits.find(h => h.unit === homeUnit)
+  const converted = home ? convertHomeUnit(quantity, home.size) : null
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
     return (catalog ?? []).filter(i => !existingIngredientIds.has(i.id) && (!q || i.name.toLowerCase().includes(q))).slice(0, q ? 8 : 12)
@@ -54,10 +61,16 @@ export function PantryItemForm({ item, existingIngredientIds, onClose, onSaved }
     setBusy(true)
     const dates = { purchasedAt: purchasedAt || null, expiresAt: expiresAt || null }
     const lowStockThreshold = threshold === '' ? null : threshold
+    // Katori/chammach/mutthi become ml or g here, and the amount is only an estimate.
+    let amount: { quantity: string; unit: InputUnit; confidence: Confidence } = { quantity, unit, confidence }
+    if (home) {
+      if (converted === null) { setBusy(false); return setError(`Enter how many ${home.unit} you have, e.g. 2 or 1.5.`) }
+      amount = { quantity: String(converted), unit: home.base, confidence: 'ESTIMATED' }
+    }
     try {
       if (item) {
         if (ownIngredient) await api.patch(`/households/${household.id}/ingredients/${ownIngredient.id}`, tags)
-        const { data } = await api.patch<PantryItem>(`/households/${household.id}/pantry/${item.id}`, { quantity, unit, lowStockThreshold, confidence, ...dates })
+        const { data } = await api.patch<PantryItem>(`/households/${household.id}/pantry/${item.id}`, { ...amount, lowStockThreshold, ...dates })
         onSaved(data)
       } else {
         let ingredientId = ingredient?.id
@@ -66,7 +79,7 @@ export function PantryItemForm({ item, existingIngredientIds, onClose, onSaved }
           ingredientId = created.data.id
           setIngredient(created.data); setCustom(null)
         }
-        const { data } = await api.post<PantryItem>(`/households/${household.id}/pantry`, { ingredientId, quantity, unit, lowStockThreshold, confidence, source, ...dates })
+        const { data } = await api.post<PantryItem>(`/households/${household.id}/pantry`, { ingredientId, ...amount, lowStockThreshold, source, ...dates })
         onSaved(data)
       }
     } catch (err) { setError(errorMessage(err, 'Could not save this item.')) }
@@ -101,9 +114,13 @@ export function PantryItemForm({ item, existingIngredientIds, onClose, onSaved }
 
       <Field label="Quantity on hand">
         <div className="quantity-input"><input value={quantity} onChange={e => setQuantity(e.target.value)} inputMode="decimal" required pattern="\d+(\.\d+)?" title="A number, e.g. 500 or 1.5" placeholder="0" />
-          <select value={unit} onChange={e => setUnit(e.target.value as InputUnit)} aria-label="Unit">{unitOptions[family].map(u => <option key={u} value={u}>{u === 'l' ? 'L' : u}</option>)}</select></div>
+          <select value={home?.unit ?? unit} onChange={e => { const next = e.target.value; if (homeUnits.some(h => h.unit === next)) { setHomeUnit(next as HomeUnit); setConfidence('ESTIMATED') } else { setHomeUnit(''); setUnit(next as InputUnit) } }} aria-label="Unit">
+            {unitOptions[family].map(u => <option key={u} value={u}>{u === 'l' ? 'L' : u}</option>)}
+            {homeUnits.map(h => <option key={h.unit} value={h.unit}>{HOME_UNIT_LABEL[h.unit]} (≈{h.size} {h.base})</option>)}
+          </select></div>
+        {home && <small className="home-unit-note">{converted !== null ? `≈ ${converted} ${home.base}. ` : ''}Saved as an estimate; confirm it later in Quick stock check.</small>}
       </Field>
-      <Field label="Low-stock alert at" hint={`Optional, in ${unit === 'l' ? 'L' : unit}.`}>
+      <Field label="Low-stock alert at" hint={`Optional, in ${home ? home.base : unit === 'l' ? 'L' : unit}.`}>
         <input value={threshold} onChange={e => setThreshold(e.target.value)} inputMode="decimal" pattern="\d+(\.\d+)?" title="A number, e.g. 200" placeholder="No alert" />
       </Field>
 

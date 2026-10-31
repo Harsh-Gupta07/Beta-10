@@ -5,7 +5,7 @@ import { listIngredients, listPantry } from './pantry.js'
 import { getRecipe, listRecipes } from './recipes.js'
 import type { SafetyStatus } from './foodSafety.js'
 import { getSuggestions } from './suggestions.js'
-import type { MealSlot } from '@prisma/client'
+import type { AppLanguage, MealSlot } from '@prisma/client'
 import { getWeek } from './planner.js'
 import { localToday } from './dates.js'
 import { describeQuantity, INPUT_UNITS, isCanonicalUnit, toCanonical, unitsFor, type InputUnit } from './units.js'
@@ -227,10 +227,17 @@ async function callGemini(model: string, contents: Content[], system: string): P
   return { role: 'model', parts: content.parts }
 }
 
-function systemPrompt(household: { name: string; defaultServings: number; timezone: string }) {
+const LANGUAGE_RULE: Record<AppLanguage, string> = {
+  EN: 'Reply in simple English.',
+  HI: 'Reply in Hindi, written in Devanagari script. Keep ingredient and dish names familiar (e.g. dal, paneer) and keep numbers and units as digits (e.g. 200 g).',
+  HINGLISH: 'Reply in Hinglish: conversational Hindi written in Latin script mixed with English, as Indian families text (e.g. "Aaj dinner mein Dal Tadka bana sakte ho"). Keep numbers and units as digits.',
+}
+
+function systemPrompt(household: { name: string; defaultServings: number; timezone: string }, language: AppLanguage) {
   return [
     `You are the KitchenSync kitchen assistant for the household "${household.name}". Today is ${localToday(household.timezone)}. They usually cook for ${household.defaultServings}.`,
     'Help with Indian home cooking: what to cook, recipe quantities, pantry stock, meal-plan shortages and shopping.',
+    LANGUAGE_RULE[language] + ' Understand the user in English, Hindi or Hinglish.',
     'Rules:',
     '- Always use tools to look up pantry, recipes, plans and shortages. Never invent stock levels, quantities or recipe amounts; report the numbers tools return.',
     '- Quantity maths (scaling, allocations, shortages) is done by the tools. Do not recalculate it yourself.',
@@ -271,11 +278,11 @@ export function assistantStatus() {
   return { configured: Boolean(env.AI_API_KEY), model: env.AI_API_KEY ? env.AI_MODEL : null, fallbackModel: env.AI_API_KEY ? env.AI_FALLBACK_MODEL : null }
 }
 
-export async function chat(householdId: string, history: ChatTurn[], message: string) {
+export async function chat(householdId: string, history: ChatTurn[], message: string, language: AppLanguage = 'EN') {
   if (!env.AI_API_KEY) return { mode: 'fallback' as const, reply: await fallbackReply(householdId, message, null), actions: [] }
   const household = await prisma.household.findUniqueOrThrow({ where: { id: householdId }, select: { name: true, defaultServings: true, timezone: true } })
   const ingredients = await listIngredients(householdId)
-  const system = systemPrompt(household)
+  const system = systemPrompt(household, language)
   const conversation: Content[] = [
     ...history.slice(-10).map(turn => ({ role: turn.role === 'assistant' ? 'model' as const : 'user' as const, parts: [{ text: turn.text }] })),
     { role: 'user', parts: [{ text: message }] },

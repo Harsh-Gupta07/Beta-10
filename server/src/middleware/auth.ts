@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma.js'
 
 export async function requireUser(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) return res.status(401).json({ error: 'Please sign in to continue.' })
-  const user = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { id: true, name: true, email: true, hasPassword: true, demoExpiresAt: true } })
+  const user = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { id: true, name: true, email: true, hasPassword: true, language: true, voiceLanguage: true, demoExpiresAt: true } })
   if (!user) return req.session.destroy(() => res.status(401).json({ error: 'Session expired. Please sign in again.' }))
   if (user.demoExpiresAt && user.demoExpiresAt < new Date()) return req.session.destroy(() => res.status(401).json({ error: 'This demo kitchen has ended. Start a new demo or create an account.' }))
   const { demoExpiresAt, ...profile } = user

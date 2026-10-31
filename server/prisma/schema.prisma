@@ -102,6 +102,12 @@ enum AgeGroup {
   SENIOR
 }
 
+enum AppLanguage {
+  EN
+  HI
+  HINGLISH
+}
+
 /// Everyday kitchen jobs, separate from the OWNER/MEMBER permission role.
 enum KitchenRole {
   PLANNER
@@ -148,6 +154,10 @@ model User {
   googleSub    String?           @unique
   /// False for accounts created through Google until they choose a password.
   hasPassword  Boolean           @default(true)
+  /// Language for the assistant's replies (and, later, the whole interface).
+  language     AppLanguage       @default(EN)
+  /// Speech language for voice input, e.g. "hi-IN" or "en-IN".
+  voiceLanguage String           @default("en-IN")
   /// Set only for "See a demo kitchen" accounts; the account and its household are deleted after this time.
   demoExpiresAt DateTime?
   createdAt    DateTime          @default(now())
@@ -178,6 +188,10 @@ model Household {
   appliances       Appliance[]       @default([])
   /// Minutes the household usually has for cooking a meal; longer recipes rank lower in suggestions.
   usualCookMinutes Int?
+  /// This household's own measures: one katori and one chammach in ml, one mutthi (handful) in grams.
+  katoriMl         Int?
+  chammachMl       Int?
+  mutthiGrams      Int?
   /// Null until the owner finishes the onboarding cards; households created before onboarding count as done.
   onboardingCompletedAt DateTime?
   familyProfiles   FamilyProfile[]

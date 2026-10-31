@@ -27,9 +27,10 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
 export type KitchenRole = 'PLANNER' | 'COOK' | 'SHOPPER' | 'STOCK_CHECKER'
 export type KitchenRoles = { members: Array<{ userId: string; name: string; roles: KitchenRole[] }>; family: Array<{ id: string; name: string; roles: KitchenRole[] }> }
 export type Appliance = 'GAS_STOVE' | 'INDUCTION' | 'MICROWAVE' | 'AIR_FRYER' | 'OVEN' | 'PRESSURE_COOKER' | 'MIXER_GRINDER'
-export type Household = { id: string; name: string; defaultServings: number; peopleCount?: number | null; appliances?: Appliance[]; usualCookMinutes?: number | null; onboardingCompletedAt?: string | null; yourRole?: "OWNER" | "MEMBER"; yourKitchenRoles?: KitchenRole[] }
+export type Household = { id: string; name: string; defaultServings: number; peopleCount?: number | null; appliances?: Appliance[]; usualCookMinutes?: number | null; katoriMl?: number | null; chammachMl?: number | null; mutthiGrams?: number | null; onboardingCompletedAt?: string | null; yourRole?: "OWNER" | "MEMBER"; yourKitchenRoles?: KitchenRole[] }
 /** isDemo marks a "See a demo kitchen" visitor; their kitchen is deleted at demoExpiresAt. */
-export type User = { id: string; name: string; email: string; hasPassword?: boolean; isDemo?: boolean; demoExpiresAt?: string }
+export type AppLanguage = 'EN' | 'HI' | 'HINGLISH'
+export type User = { id: string; name: string; email: string; language?: AppLanguage; voiceLanguage?: 'en-IN' | 'hi-IN'; hasPassword?: boolean; isDemo?: boolean; demoExpiresAt?: string }
 
 export type CanonicalUnit = 'g' | 'ml' | 'count'
 export type InputUnit = 'g' | 'kg' | 'ml' | 'l' | 'pcs'

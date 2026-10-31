@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import type { AppLanguage } from '@prisma/client'
 import { z } from 'zod'
 import * as assistant from '../services/assistant.js'
 import { env } from '../config/env.js'
@@ -19,5 +20,5 @@ assistantRouter.post('/assistant/messages', messageLimit, async (req, res) => {
     message: z.string().trim().min(1).max(1000),
     history: z.array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().max(4000) })).max(20).default([]),
   }).parse(req.body)
-  res.json(await assistant.chat(res.locals.householdId as string, input.history, input.message))
+  res.json(await assistant.chat(res.locals.householdId as string, input.history, input.message, (res.locals.user as { language: AppLanguage }).language))
 })

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Copy, KeyRound, LogOut, RefreshCw, Sparkles, UserMinus } from 'lucide-react'
-import { api, errorMessage, type HouseholdDetails } from '../../lib/api'
+import { api, errorMessage, type Household, type HouseholdDetails, type User } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { Badge, Field, Notice, PageHeader, Spinner } from '../../components/ui'
 import { PasswordInput } from '../../components/PasswordInput'
 import { KitchenFields, type KitchenSetup } from '../onboarding/KitchenFields'
 import { RolesEditor } from '../onboarding/RolesEditor'
+import { LanguageFields, type LanguageSetup } from '../onboarding/LanguageFields'
+import { DEFAULT_MEASURES } from '../../lib/measures'
 
 const TIMEZONES = ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York', 'America/Los_Angeles', 'Australia/Sydney', 'UTC']
 
@@ -67,6 +69,8 @@ export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promi
         </div>
       </section>
 
+      <LanguagePanel user={user} household={household} details={details} owner={owner} onSaved={async message => { setNotice(message); await onSessionChange() }} onError={setError} />
+
       <section className="panel">
         <p className="eyebrow">KITCHEN JOBS</p><h2 className="panel-title">Who does what</h2>
         <p className="muted small">Each person sees their own jobs first on the dashboard.</p>
@@ -123,5 +127,27 @@ function ProfileCard({ name, email, hasPassword, isDemo, onSaveName, onChangePas
       <Field label="New password" hint="At least 10 characters."><PasswordInput value={next} onChange={e => setNext(e.target.value)} minLength={10} autoComplete="new-password" required /></Field>
       <button className="secondary-button">{hasPassword ? 'Change password' : 'Set password'}</button>
     </form>}
+  </section>
+}
+
+function LanguagePanel({ user, household, details, owner, onSaved, onError }: { user: User; household: Household; details: HouseholdDetails; owner: boolean; onSaved: (message: string) => Promise<void>; onError: (message: string) => void }) {
+  const [setup, setSetup] = useState<LanguageSetup>({
+    language: user.language ?? 'EN', voiceLanguage: user.voiceLanguage ?? 'en-IN',
+    katoriMl: details.katoriMl ?? DEFAULT_MEASURES.katoriMl, chammachMl: details.chammachMl ?? DEFAULT_MEASURES.chammachMl, mutthiGrams: details.mutthiGrams ?? DEFAULT_MEASURES.mutthiGrams,
+  })
+  const [busy, setBusy] = useState(false)
+  async function save() {
+    setBusy(true); onError('')
+    try {
+      await api.patch('/auth/me', { language: setup.language, voiceLanguage: setup.voiceLanguage })
+      if (owner) await api.patch(`/households/${household.id}`, { katoriMl: setup.katoriMl, chammachMl: setup.chammachMl, mutthiGrams: setup.mutthiGrams })
+      await onSaved('Language and measures saved.')
+    } catch (err) { onError(errorMessage(err)) }
+    finally { setBusy(false) }
+  }
+  return <section className="panel">
+    <p className="eyebrow">LANGUAGE & MEASURES</p><h2 className="panel-title">How you talk and measure</h2>
+    <LanguageFields value={setup} onChange={setSetup} measuresEditable={owner} />
+    <div className="panel-actions"><button type="button" className="primary-button" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button></div>
   </section>
 }

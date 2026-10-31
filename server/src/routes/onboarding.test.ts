@@ -116,3 +116,18 @@ describe('kitchen roles', () => {
     assert.equal((await outsider.api('GET', `/households/${owner.householdId}/roles`)).status, 404)
   })
 })
+
+describe('language and measures', () => {
+  it('saves my language and voice language, and the household’s katori, chammach and mutthi', async () => {
+    const { api, householdId } = await signUpWithHousehold('Bhasha')
+    assert.deepEqual([(await api('GET', '/auth/me')).body.user.language, (await api('GET', '/auth/me')).body.user.voiceLanguage], ['EN', 'en-IN'])
+    const me = await api('PATCH', '/auth/me', { language: 'HINGLISH', voiceLanguage: 'hi-IN' })
+    assert.deepEqual([me.status, me.body.language, me.body.voiceLanguage, me.body.name], [200, 'HINGLISH', 'hi-IN', 'Bhasha'])
+    assert.equal((await api('PATCH', '/auth/me', { language: 'FR' })).status, 400)
+
+    const measures = await api('PATCH', `/households/${householdId}`, { katoriMl: 150, chammachMl: 15, mutthiGrams: 30 })
+    assert.deepEqual([measures.body.katoriMl, measures.body.chammachMl, measures.body.mutthiGrams], [150, 15, 30])
+    assert.equal((await api('PATCH', `/households/${householdId}`, { katoriMl: 5000 })).status, 400)
+    assert.equal((await api('GET', `/households/${householdId}`)).body.katoriMl, 150)
+  })
+})

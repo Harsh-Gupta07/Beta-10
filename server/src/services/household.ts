@@ -13,17 +13,17 @@ function assertOwner(role: HouseholdRole) {
 export async function getHousehold(householdId: string, role: HouseholdRole) {
   const household = await prisma.household.findUniqueOrThrow({
     where: { id: householdId },
-    select: { id: true, name: true, defaultServings: true, timezone: true, inviteCode: true, createdAt: true, peopleCount: true, appliances: true, usualCookMinutes: true,
+    select: { id: true, name: true, defaultServings: true, timezone: true, inviteCode: true, createdAt: true, peopleCount: true, appliances: true, usualCookMinutes: true, katoriMl: true, chammachMl: true, mutthiGrams: true,
       members: { select: { role: true, joinedAt: true, user: { select: { id: true, name: true, email: true } } }, orderBy: { joinedAt: 'asc' } } },
   })
   return { ...household, members: household.members.map(({ user, role, joinedAt }) => ({ ...user, role, joinedAt })), yourRole: role }
 }
 
-export async function updateHousehold(householdId: string, role: HouseholdRole, input: { name?: string; defaultServings?: number; timezone?: string; appliances?: Appliance[]; usualCookMinutes?: number | null }) {
+export async function updateHousehold(householdId: string, role: HouseholdRole, input: { name?: string; defaultServings?: number; timezone?: string; appliances?: Appliance[]; usualCookMinutes?: number | null; katoriMl?: number | null; chammachMl?: number | null; mutthiGrams?: number | null }) {
   assertOwner(role)
   if (input.timezone && !isValidTimeZone(input.timezone)) throw new AppError(400, 'Choose a valid timezone.')
   const data = { ...input, ...(input.appliances ? { appliances: [...new Set(input.appliances)] } : {}) }
-  return prisma.household.update({ where: { id: householdId }, data, select: { id: true, name: true, defaultServings: true, timezone: true, appliances: true, usualCookMinutes: true } })
+  return prisma.household.update({ where: { id: householdId }, data, select: { id: true, name: true, defaultServings: true, timezone: true, appliances: true, usualCookMinutes: true, katoriMl: true, chammachMl: true, mutthiGrams: true } })
 }
 
 export async function createInviteCode(householdId: string, role: HouseholdRole) {

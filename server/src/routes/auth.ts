@@ -86,9 +86,13 @@ authRouter.get('/me', requireUser, async (_req, res, next) => {
 
 authRouter.patch('/me', requireUser, async (req, res, next) => {
   try {
-    const input = z.object({ name: z.string().trim().min(1).max(80) }).parse(req.body)
+    const input = z.object({
+      name: z.string().trim().min(1).max(80).optional(),
+      language: z.enum(['EN', 'HI', 'HINGLISH']).optional(),
+      voiceLanguage: z.enum(['en-IN', 'hi-IN']).optional(),
+    }).parse(req.body)
     const user = res.locals.user as { id: string }
-    res.json(await prisma.user.update({ where: { id: user.id }, data: input, select: { id: true, name: true, email: true } }))
+    res.json(await prisma.user.update({ where: { id: user.id }, data: input, select: { id: true, name: true, email: true, language: true, voiceLanguage: true } }))
   } catch (error) { next(error) }
 })
 
