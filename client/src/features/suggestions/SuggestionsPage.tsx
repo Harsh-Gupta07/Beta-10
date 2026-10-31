@@ -33,7 +33,8 @@ export function SuggestionsPage() {
   }, [household.id, scope, slot])
   useEffect(() => { void load() }, [load])
 
-  const changed = (message: string) => { setNotice(message); void load() }
+  // Refresh first, so the confirmation never appears next to a stale list.
+  const changed = async (message: string) => { setNotice(''); await load(); setNotice(message) }
 
   return <>
     <PageHeader eyebrow="WHAT TO COOK" title="Ideas for your next meal" description="Ranked from your pantry, what you’ve eaten lately and what people like. Dishes that clash with anyone’s allergies or diet are never suggested." />
@@ -85,7 +86,7 @@ function RecentlyEaten({ history, today, onChanged }: { history: HistoryData; to
           </li>)}</ul>}
       {history.meals.length > 0 && <>
         <h3 className="subhead">Meals</h3>
-        <ul className="history-list">{history.meals.slice(0, 12).map(meal => <li key={meal.id}>
+        <ul className="eaten-list">{history.meals.slice(0, 12).map(meal => <li key={meal.id}>
           <button className="history-row" onClick={() => setOpen(open === meal.id ? null : meal.id)} aria-expanded={open === meal.id}>
             <span><strong>{meal.recipe.name}</strong><small>{relativeDay(meal.date, today)} · {slotLabel[meal.slot]}</small></span>
             <span className="badge-row">{meal.source === 'LOGGED' && <Badge tone="grey">Logged</Badge>}<Badge tone="blue"><Users size={11} aria-hidden className="inline-icon" /> {meal.eaters.length}</Badge></span>

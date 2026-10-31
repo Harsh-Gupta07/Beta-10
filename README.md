@@ -21,6 +21,7 @@ Phase 1 MVP status: all 10 modules work, and 47 automated tests pass.
   - [9. Household & Settings](#9-household--settings)
   - [10. Dashboard and notifications](#10-dashboard-and-notifications)
   - [11. Food preferences and allergies](#11-food-preferences-and-allergies)
+  - [12. What to cook (suggestions)](#12-what-to-cook-suggestions)
 - [A typical week: try this first](#a-typical-week-try-this-first)
 - [Key ideas to understand](#key-ideas-to-understand)
 - [Troubleshooting](#troubleshooting)
@@ -221,6 +222,19 @@ Use **Safe for everyone** on the Recipes page to see only dishes that suit every
 
 When you add a **custom ingredient** in the Pantry, say what it is and tick its allergens. Edit the pantry item to change them later. Built-in ingredients are tagged by KitchenSync. Always check packaged products' labels; tags describe typical ingredients, not every brand.
 
+### 12. What to cook (suggestions)
+
+Open **What to Cook** in the menu (the top three also appear on the Dashboard, and in the planner when you add a meal). Each idea lists **why** it was picked, for example *Ready with what you have*, *Haven't had it in 12 days*, *Asha's favourite*, or a warning such as *You had this yesterday*.
+
+Suggestions come from your own data, never from guesses:
+
+- **Pantry**: "Ready" uses only stock that isn't already reserved for planned meals.
+- **What you've eaten**: meals marked **cooked** count for everyone in the household. Untick anyone who wasn't eating under **Who's eating** on the meal. For meals you didn't cook through the planner, use **We ate this** to log them; logging never changes your pantry.
+- **What people like**: favourites, dislikes, cuisines and spice limits from Food Preferences.
+- Dishes that clash with anyone's allergy or diet, and drinks, are never suggested.
+
+Switch between **Everyone** and **Just me**, or pick a meal. On each idea: **Plan it** adds it to the planner, **Not today** hides it for everyone for 3 days, **Love it** and **Don't suggest for me** update your own preferences. The AI Assistant uses the same ranking when you ask "What should we cook?".
+
 ---
 
 ## A typical week: try this first
@@ -293,11 +307,12 @@ The free tier allows only a few requests per minute, and one question can take 2
 - **Concurrency.** Stock changes run in transactions with `SELECT … FOR UPDATE`.
 - **Household isolation.** Every route checks membership on the server; other households get 404.
 - **Audit trail.** Every stock change is an append-only `StockTransaction` with the balance after it.
+- **Suggestions are ranked, not generated.** `server/src/services/recommend.ts` is a pure scoring function; every point comes with a reason. History is read from cooked meals and manual logs (`eatingHistory.ts`), never copied, and pantry fit uses unreserved stock from the allocation engine.
 - **Allergy and diet checks are never guessed.** `server/src/services/foodSafety.ts` is a pure function: a recipe's diet type and allergens come from its ingredients' tags, and an untagged or unchecked ingredient makes the answer "unknown", never "safe". It is computed on every read, so removing a member or retagging an ingredient takes effect immediately. The assistant receives the reasons without members' names.
 
 ### Tests
 
-`npm test` runs 73 tests against a real PostgreSQL database: unit conversion and scaling, the allocation engine (including the brief's rice example), food safety and preferences, release hardening, pantry, recipes, planner, cooking (double and simultaneous completion), shopping (partial delivery, double receipt), verification and notifications, invites and permissions, the assistant's offline mode, and the brief's full integration journey (`server/src/routes/journey.test.ts`).
+`npm test` runs 89 tests against a real PostgreSQL database: unit conversion and scaling, the allocation engine (including the brief's rice example), food safety and preferences, eating history and suggestions, release hardening, pantry, recipes, planner, cooking (double and simultaneous completion), shopping (partial delivery, double receipt), verification and notifications, invites and permissions, the assistant's offline mode, and the brief's full integration journey (`server/src/routes/journey.test.ts`).
 
 1. Create a test database: `CREATE DATABASE kitchensync_test OWNER kitchensync;`
 2. Set `TEST_DATABASE_URL` in `server/.env`. Its name must contain `test`.

@@ -608,11 +608,12 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
 .plain-list li:first-child { border-top: 0; }
 .plain-list .link-button { display: inline-flex; align-items: center; gap: 4px; }
 .subhead { font-size: 13px; margin: 18px 0 4px; }
-.history-list { list-style: none; margin: 0; padding: 0; }
-.history-list > li { border-top: 1px solid var(--line); }
-.history-list > li:first-child { border-top: 0; }
+.eaten-list { list-style: none; margin: 0; padding: 0; }
+.eaten-list > li { border-top: 1px solid var(--line); }
+.eaten-list > li:first-child { border-top: 0; }
 .history-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; padding: 9px 0; text-align: left; font-size: 13px; }
-.history-row > span:first-child { display: grid; gap: 2px; }
+.history-row > span:first-child { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.history-row .badge-row { flex: none; }
 .history-row small { color: var(--muted); font-size: 11.5px; }
 .history-detail { display: grid; gap: 10px; padding: 0 0 12px; }
 .suggested-strip { margin-bottom: 14px; }
