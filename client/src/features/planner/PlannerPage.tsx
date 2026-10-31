@@ -58,7 +58,7 @@ export function PlannerPage() {
     <PageHeader eyebrow="MEAL PLANNER" title="This week’s meals" description="Plan breakfast, lunch and dinner. Each plan reserves pantry stock in date order. Nothing is deducted until you cook."
       actions={data && <div className="week-nav">
         <button className="icon-button" onClick={() => goToWeek(addDays(data.weekStart, -7))} aria-label="Previous week"><ChevronLeft size={18} /></button>
-        <span className="week-label">{formatDay(data.weekStart)} – {formatDay(data.weekEnd)}</span>
+        <span className="week-label">{formatDay(data.weekStart)} to {formatDay(data.weekEnd)}</span>
         <button className="icon-button" onClick={() => goToWeek(addDays(data.weekStart, 7))} aria-label="Next week"><ChevronRight size={18} /></button>
         {!isCurrentWeek && <button className="ghost-button" onClick={() => goToWeek(null)}>This week</button>}
       </div>} />
@@ -100,7 +100,7 @@ export function PlannerPage() {
                   </span>
                 </button>}
                 {canAdd && <button className="add-slot" onClick={() => setAdding({ date: day, slot })} aria-label={`Plan ${slotLabel[slot]} on ${formatDay(day)}`}><Plus size={14} aria-hidden />{meal ? 'Plan another' : 'Add'}</button>}
-                {!meal && past && <span className="slot-empty">—</span>}
+                {!meal && past && <span className="slot-empty">Not planned</span>}
               </div>
             })}
           </div>

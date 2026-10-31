@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, Clock, Copy, Flame, Minus, PencilLine, Plus, Trash2, TriangleAlert, Users } from 'lucide-react'
+import { ArrowLeft, CalendarPlus, Check, Clock, Copy, Flame, Minus, PencilLine, Plus, ShieldCheck, Trash2, TriangleAlert, Users } from 'lucide-react'
 import { api, errorMessage, type RecipeDetail } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatQuantity } from '../../lib/format'
 import { Badge, Modal, Notice, Spinner } from '../../components/ui'
 import { RecipeForm } from './RecipeForm'
+import { RecipePhoto } from './RecipePhoto'
 import { DietBadge, SafetyPanel } from './RecipeSafety'
 import { ALLERGEN_LABEL, SPICE_LABEL } from '../../lib/food'
 
@@ -55,23 +56,33 @@ export function RecipeDetailPage() {
   const missing = recipe.ingredients.filter(l => !l.enough)
   return <>
     <BackLink />
-    <header className="recipe-hero">
-      <div>
-        <p className="eyebrow">{recipe.category}</p>
-        <h1>{recipe.name} {recipe.custom && <Badge tone="blue">Yours</Badge>}</h1>
-        {recipe.description && <p className="muted">{recipe.description}</p>}
+    <header className="recipe-detail-hero">
+      <RecipePhoto name={recipe.name} variant="hero" showSource />
+      <div className="recipe-hero-content">
+        <div><p className="eyebrow">{recipe.category}</p>
+          <h1>{recipe.name} {recipe.custom && <Badge tone="blue">Your recipe</Badge>}</h1>
+          {recipe.description && <p className="recipe-description">{recipe.description}</p>}
+        </div>
         <div className="recipe-meta large">
-          <span><Clock size={15} aria-hidden />Prep {recipe.prepMinutes} min · Cook {recipe.cookMinutes} min</span>
-          <span><Users size={15} aria-hidden />Written for {recipe.baseServings}</span>
+          <span><Clock size={15} aria-hidden />{recipe.prepMinutes} min prep</span>
+          <span><Clock size={15} aria-hidden />{recipe.cookMinutes} min cook</span>
+          <span><Users size={15} aria-hidden />{recipe.baseServings} servings</span>
           {recipe.cuisine && <span>{recipe.cuisine}</span>}
           {recipe.spiceLevel && <span><Flame size={15} aria-hidden />{SPICE_LABEL[recipe.spiceLevel]}</span>}
         </div>
         <div className="badge-row"><DietBadge recipe={recipe} />{recipe.tags.map(tag => <Badge key={tag} tone="grey">{tag}</Badge>)}</div>
-      </div>
-      <div className="header-actions">
-        {recipe.custom
-          ? <><button className="ghost-button danger-text" onClick={() => setConfirmDelete(true)}><Trash2 size={15} aria-hidden />Delete</button><button className="secondary-button" onClick={startEdit}><PencilLine size={15} aria-hidden />Edit</button></>
-          : <button className="secondary-button" onClick={duplicate} disabled={busy} title="Built-in recipes are read-only"><Copy size={15} aria-hidden />{busy ? 'Copying…' : 'Make a copy to edit'}</button>}
+        <div className="recipe-snapshot">
+          <span><strong>{recipe.ingredients.length}</strong><small>Ingredients</small></span>
+          <span className={missing.length ? 'attention' : 'ready'}><strong>{missing.length}</strong><small>Need attention</small></span>
+          <span><strong>{recipe.prepMinutes + recipe.cookMinutes}</strong><small>Total minutes</small></span>
+        </div>
+        <div className="recipe-hero-actions">
+          <Link className="primary-button" to="/planner"><CalendarPlus size={16} aria-hidden />Plan this meal</Link>
+          {recipe.custom
+            ? <><button className="secondary-button" onClick={startEdit}><PencilLine size={15} aria-hidden />Edit recipe</button><button className="icon-button danger-text" onClick={() => setConfirmDelete(true)} aria-label="Delete recipe" title="Delete recipe"><Trash2 size={16} aria-hidden /></button></>
+            : <button className="secondary-button" onClick={duplicate} disabled={busy} title="Built-in recipes are read-only"><Copy size={15} aria-hidden />{busy ? 'Copying…' : 'Copy to edit'}</button>}
+        </div>
+        <p className="recipe-trust"><ShieldCheck size={15} aria-hidden />Pantry availability uses live household stock. Planning reserves stock; cooking deducts it once.</p>
       </div>
     </header>
     {actionError && <Notice>{actionError}</Notice>}
