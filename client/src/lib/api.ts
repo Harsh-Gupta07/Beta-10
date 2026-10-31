@@ -29,11 +29,36 @@ export type CanonicalUnit = 'g' | 'ml' | 'count'
 export type InputUnit = 'g' | 'kg' | 'ml' | 'l' | 'pcs'
 export type Confidence = 'CONFIRMED' | 'ESTIMATED' | 'CHECK_NEEDED'
 
-export type Ingredient = { id: string; name: string; category: string; canonicalUnit: CanonicalUnit; householdId: string | null }
+export type Allergen = 'MILK' | 'EGG' | 'PEANUT' | 'TREE_NUT' | 'GLUTEN' | 'SOY' | 'SESAME' | 'FISH' | 'SHELLFISH' | 'MUSTARD'
+export type DietClass = 'PLANT' | 'DAIRY' | 'EGG' | 'MEAT' | 'SEAFOOD'
+export type DietType = 'VEGAN' | 'VEGETARIAN' | 'EGGETARIAN' | 'NON_VEGETARIAN'
+
+export type Ingredient = {
+  id: string; name: string; category: string; canonicalUnit: CanonicalUnit; householdId: string | null
+  dietClass: DietClass | null; allergens: Allergen[]; allergensReviewed: boolean
+}
+
+/** Whether a recipe suits every household member, worked out on the server from ingredient tags. */
+export type RecipeSafety = {
+  status: 'SUITABLE' | 'CONFLICT' | 'UNKNOWN'
+  conflicts: Array<{ member: string; kind: 'ALLERGY' | 'RESTRICTION'; reason: string }>
+  uncertain: string[]
+  unreviewed: string[]
+}
+
+type NamedRef = { id: string; name: string }
+export type FoodPreferences = {
+  dietType: DietType | null; allergens: Allergen[]; maxSpice: number | null; cuisines: string[]
+  avoidIngredients: NamedRef[]; likedIngredients: NamedRef[]; favouriteRecipes: NamedRef[]; dislikedRecipes: NamedRef[]
+}
+export type HouseholdFoodProfile = {
+  cuisines: string[]; usualSpice: number | null
+  members: Array<{ id: string; name: string; dietType: DietType | null; allergens: Allergen[]; avoidIngredients: NamedRef[] }>
+}
 
 export type PantryItem = {
   id: string
-  ingredient: { id: string; name: string; category: string; canonicalUnit: CanonicalUnit; custom: boolean }
+  ingredient: { id: string; name: string; category: string; canonicalUnit: CanonicalUnit; custom: boolean; dietClass: DietClass | null; allergens: Allergen[]; allergensReviewed: boolean }
   quantity: string
   unit: CanonicalUnit
   lowStockThreshold: string | null
@@ -68,15 +93,23 @@ export type RecipeSummary = {
   baseServings: number
   prepMinutes: number
   cookMinutes: number
+  cuisine: string
+  spiceLevel: number | null
+  tags: string[]
   custom: boolean
   ingredientCount: number
   /** Lines the pantry can't cover at the household's usual servings. */
   missingCount: number
+  /** Null when an ingredient isn't classified yet. */
+  dietType: DietType | null
+  allergens: Allergen[]
+  safety: RecipeSafety
   updatedAt: string
 }
 
 export type RecipeLine = {
   ingredient: { id: string; name: string; category: string; canonicalUnit: CanonicalUnit }
+  allergens: Allergen[]
   quantity: string
   unit: CanonicalUnit
   note: string

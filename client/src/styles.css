@@ -563,3 +563,26 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
 @media (max-width: 760px) {
   .usage-table li > span[data-label]::before { content: attr(data-label); display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: #8a958c; margin-bottom: 2px; }
 }
+
+/* ---------- Food preferences and recipe suitability ---------- */
+.stack { display: grid; gap: 16px; align-content: start; }
+.safety-panel { padding: 12px 14px; border-radius: 10px; margin: 0 0 16px; font-size: 13px; line-height: 1.5; background: var(--mint); color: var(--green-dark); }
+.safety-panel.conflict { background: var(--red-bg); color: #8f322b; }
+.safety-panel.unknown { background: #eff1ec; color: var(--ink-soft); }
+.safety-panel ul { margin: 6px 0; padding-left: 20px; }
+.safety-panel .small { margin: 6px 0 0; }
+.safety-title { display: flex; align-items: center; gap: 7px; margin: 0; font-weight: 700; }
+.allergen-note { color: var(--red); }
+.chip-field { border: 0; padding: 0; margin: 0; min-width: 0; }
+.chip-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.chip-options .toggle-chip { height: 32px; }
+.chip-picker { display: grid; gap: 8px; }
+.chip-picker .chip-options { margin-top: 0; }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 6px 0 11px; border-radius: 999px; background: var(--mint); color: var(--green-dark); font-size: 12px; font-weight: 600; }
+.chip button { display: inline-flex; padding: 3px; border-radius: 999px; }
+.chip button:hover { background: rgba(0, 0, 0, .06); }
+.needs-list { list-style: none; margin: 0; padding: 0; }
+.needs-list li { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.needs-list li:first-child { border-top: 0; }
+.check-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; font-weight: 600; }
+.check-row input { width: 16px; height: 16px; accent-color: var(--green); }

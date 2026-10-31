@@ -2,6 +2,8 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { AppError, notFound } from '../lib/errors.js'
 import { isCanonicalUnit, scaleQuantity, toCanonical, unitsFor, type CanonicalUnit, type InputUnit } from './units.js'
+import { assessRecipe, type MemberNeeds } from './foodSafety.js'
+import { householdNeeds } from './foodPreferences.js'
 
 export type RecipeIngredientInput = { ingredientId: string; quantity: string | number; unit?: InputUnit; note?: string }
 export type RecipeInput = {
@@ -12,13 +14,16 @@ export type RecipeInput = {
   prepMinutes: number
   cookMinutes: number
   instructions: string[]
+  cuisine?: string
+  spiceLevel?: number | null
+  tags?: string[]
   ingredients: RecipeIngredientInput[]
 }
 
 /** Recipes a household can see: its own plus the shared (seeded) catalog. */
 export const visibleTo = (householdId: string): Prisma.RecipeWhereInput => ({ OR: [{ householdId }, { householdId: null, isShared: true }] })
 
-const lineInclude = { ingredient: { select: { id: true, name: true, category: true, canonicalUnit: true } } } as const
+const lineInclude = { ingredient: { select: { id: true, name: true, category: true, canonicalUnit: true, dietClass: true, allergens: true, allergensReviewed: true } } } as const
 const recipeInclude = { ingredients: { include: lineInclude, orderBy: { position: 'asc' } } } as const satisfies Prisma.RecipeInclude
 type RecipeRow = Prisma.RecipeGetPayload<{ include: typeof recipeInclude }>
 
@@ -47,7 +52,8 @@ function scaleLines(recipe: RecipeRow, servings: number, pantry: Map<string, Pri
     const onHand = pantry.get(line.ingredientId) ?? null
     const missing = onHand === null ? needed : Prisma.Decimal.max(needed.minus(onHand), 0)
     return {
-      ingredient: line.ingredient,
+      ingredient: { id: line.ingredient.id, name: line.ingredient.name, category: line.ingredient.category, canonicalUnit: line.ingredient.canonicalUnit },
+      allergens: line.ingredient.allergens,
       quantity: needed.toString(),
       unit,
       note: line.note,
@@ -58,8 +64,9 @@ function scaleLines(recipe: RecipeRow, servings: number, pantry: Map<string, Pri
   })
 }
 
-function summary(recipe: RecipeRow, servings: number, pantry: Map<string, Prisma.Decimal>) {
+function summary(recipe: RecipeRow, servings: number, pantry: Map<string, Prisma.Decimal>, needs: MemberNeeds[]) {
   const lines = scaleLines(recipe, servings, pantry)
+  const safety = assessRecipe(recipe.ingredients.map(line => line.ingredient), needs)
   return {
     id: recipe.id,
     name: recipe.name,
@@ -68,9 +75,15 @@ function summary(recipe: RecipeRow, servings: number, pantry: Map<string, Prisma
     baseServings: recipe.baseServings,
     prepMinutes: recipe.prepMinutes,
     cookMinutes: recipe.cookMinutes,
+    cuisine: recipe.cuisine,
+    spiceLevel: recipe.spiceLevel,
+    tags: recipe.tags,
     custom: recipe.householdId !== null,
     ingredientCount: lines.length,
     missingCount: lines.filter(line => !line.enough).length,
+    dietType: safety.dietType,
+    allergens: safety.allergens,
+    safety: { status: safety.status, conflicts: safety.conflicts, uncertain: safety.uncertain, unreviewed: safety.unreviewed },
     updatedAt: recipe.updatedAt,
   }
 }
@@ -81,7 +94,8 @@ export async function listRecipes(householdId: string) {
     pantryByIngredient(householdId),
     householdServings(householdId),
   ])
-  return { servings, recipes: recipes.map(recipe => summary(recipe, servings, pantry)) }
+  const needs = await householdNeeds(householdId)
+  return { servings, recipes: recipes.map(recipe => summary(recipe, servings, pantry, needs)) }
 }
 
 async function findVisible(householdId: string, recipeId: string) {
@@ -91,9 +105,9 @@ async function findVisible(householdId: string, recipeId: string) {
 }
 
 export async function getRecipe(householdId: string, recipeId: string, servings?: number) {
-  const [recipe, pantry, defaultServings] = await Promise.all([findVisible(householdId, recipeId), pantryByIngredient(householdId), householdServings(householdId)])
+  const [recipe, pantry, defaultServings, needs] = await Promise.all([findVisible(householdId, recipeId), pantryByIngredient(householdId), householdServings(householdId), householdNeeds(householdId)])
   const target = servings ?? defaultServings
-  return { ...summary(recipe, target, pantry), servings: target, instructions: recipe.instructions, ingredients: scaleLines(recipe, target, pantry) }
+  return { ...summary(recipe, target, pantry, needs), servings: target, instructions: recipe.instructions, ingredients: scaleLines(recipe, target, pantry) }
 }
 
 /** Validates ingredient references and converts every line into canonical units. */
@@ -118,6 +132,8 @@ const recipeData = (input: RecipeInput) => ({
   name: input.name.trim(), description: input.description.trim(), category: input.category.trim() || 'Other',
   baseServings: input.baseServings, prepMinutes: input.prepMinutes, cookMinutes: input.cookMinutes,
   instructions: input.instructions.map(step => step.trim()).filter(Boolean),
+  cuisine: input.cuisine?.trim() ?? '', spiceLevel: input.spiceLevel ?? null,
+  tags: [...new Set((input.tags ?? []).map(tag => tag.trim().toLowerCase()).filter(Boolean))],
 })
 
 export async function createRecipe(householdId: string, input: RecipeInput) {
@@ -156,6 +172,7 @@ export async function duplicateRecipe(householdId: string, recipeId: string) {
     data: {
       householdId, name: source.householdId ? `${source.name} (copy)` : source.name, description: source.description, category: source.category,
       baseServings: source.baseServings, prepMinutes: source.prepMinutes, cookMinutes: source.cookMinutes, instructions: source.instructions,
+      cuisine: source.cuisine, spiceLevel: source.spiceLevel, tags: source.tags,
       ingredients: { create: source.ingredients.map(({ ingredientId, quantity, unit, note, position }) => ({ ingredientId, quantity, unit, note, position })) },
     },
   })

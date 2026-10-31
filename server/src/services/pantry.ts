@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { Prisma, type StockConfidence, type StockSource, type StockTransactionType } from '@prisma/client'
+import { Prisma, type Allergen, type DietClass, type StockConfidence, type StockSource, type StockTransactionType } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { AppError, notFound } from '../lib/errors.js'
 import { expiryState, isCanonicalUnit, MAX_CANONICAL_QUANTITY, stockStatus, toCanonical, unitsFor, type CanonicalUnit, type InputUnit } from './units.js'
@@ -8,7 +8,7 @@ import { notifyIfMealsAffected } from './notifications.js'
 type Tx = Prisma.TransactionClient
 type QuantityInput = { quantity: string | number; unit?: InputUnit }
 
-const itemInclude = { ingredient: { select: { id: true, name: true, category: true, canonicalUnit: true, householdId: true } } } as const
+const itemInclude = { ingredient: { select: { id: true, name: true, category: true, canonicalUnit: true, householdId: true, dietClass: true, allergens: true, allergensReviewed: true } } } as const
 type PantryRow = Prisma.PantryItemGetPayload<{ include: typeof itemInclude }>
 
 function canonicalOf(ingredient: { canonicalUnit: string }): CanonicalUnit {
@@ -23,7 +23,8 @@ function convert(input: QuantityInput, canonical: CanonicalUnit) {
 export function serializePantryItem(item: PantryRow, now = new Date()) {
   return {
     id: item.id,
-    ingredient: { id: item.ingredient.id, name: item.ingredient.name, category: item.ingredient.category, canonicalUnit: item.ingredient.canonicalUnit, custom: item.ingredient.householdId !== null },
+    ingredient: { id: item.ingredient.id, name: item.ingredient.name, category: item.ingredient.category, canonicalUnit: item.ingredient.canonicalUnit, custom: item.ingredient.householdId !== null,
+      dietClass: item.ingredient.dietClass, allergens: item.ingredient.allergens, allergensReviewed: item.ingredient.allergensReviewed },
     quantity: item.quantity.toString(),
     unit: item.unit,
     lowStockThreshold: item.lowStockThreshold?.toString() ?? null,
@@ -54,22 +55,38 @@ function recordTransaction(tx: Tx, item: PantryRow, actorUserId: string, type: S
 
 // ---- Ingredient catalog ----
 
+const ingredientSelect = { id: true, name: true, category: true, canonicalUnit: true, householdId: true, dietClass: true, allergens: true, allergensReviewed: true } as const
+type FoodTags = { dietClass?: DietClass | null; allergens?: Allergen[]; allergensReviewed?: boolean }
+
 export function listIngredients(householdId: string) {
   return prisma.ingredient.findMany({
     where: { OR: [{ householdId: null }, { householdId }] },
-    select: { id: true, name: true, category: true, canonicalUnit: true, householdId: true },
+    select: ingredientSelect,
     orderBy: [{ category: 'asc' }, { name: 'asc' }],
   })
 }
 
-export async function createIngredient(householdId: string, input: { name: string; category: string; canonicalUnit: CanonicalUnit }) {
+const tagData = (input: FoodTags) => ({
+  ...(input.dietClass !== undefined ? { dietClass: input.dietClass } : {}),
+  ...(input.allergens ? { allergens: [...new Set(input.allergens)] } : {}),
+  ...(input.allergensReviewed !== undefined ? { allergensReviewed: input.allergensReviewed } : {}),
+})
+
+export async function createIngredient(householdId: string, input: { name: string; category: string; canonicalUnit: CanonicalUnit } & FoodTags) {
   const nameKey = input.name.trim().toLowerCase()
   const existing = await prisma.ingredient.findFirst({ where: { nameKey, OR: [{ householdId: null }, { householdId }] } })
   if (existing) throw new AppError(409, `"${existing.name}" is already in your ingredient list.`)
   return prisma.ingredient.create({
-    data: { householdId, name: input.name.trim(), nameKey, category: input.category.trim() || 'Other', canonicalUnit: input.canonicalUnit },
-    select: { id: true, name: true, category: true, canonicalUnit: true, householdId: true },
+    data: { householdId, name: input.name.trim(), nameKey, category: input.category.trim() || 'Other', canonicalUnit: input.canonicalUnit, ...tagData(input) },
+    select: ingredientSelect,
   })
+}
+
+export async function tagIngredient(householdId: string, ingredientId: string, input: FoodTags) {
+  const ingredient = await prisma.ingredient.findFirst({ where: { id: ingredientId, OR: [{ householdId: null }, { householdId }] }, select: { householdId: true } })
+  if (!ingredient) throw notFound('Ingredient')
+  if (ingredient.householdId === null) throw new AppError(403, 'Built-in ingredients are tagged by KitchenSync and can’t be changed.')
+  return prisma.ingredient.update({ where: { id: ingredientId }, data: tagData(input), select: ingredientSelect })
 }
 
 // ---- Pantry ----

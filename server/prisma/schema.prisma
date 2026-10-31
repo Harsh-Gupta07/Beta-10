@@ -54,6 +54,47 @@ enum ShoppingItemStatus {
   RECEIVED
 }
 
+enum Allergen {
+  MILK
+  EGG
+  PEANUT
+  TREE_NUT
+  GLUTEN
+  SOY
+  SESAME
+  FISH
+  SHELLFISH
+  MUSTARD
+}
+
+/// What an ingredient is, for working out a recipe's diet type.
+enum DietClass {
+  PLANT
+  DAIRY
+  EGG
+  MEAT
+  SEAFOOD
+}
+
+/// What a person eats. Recipes don't store one: it is derived from their ingredients.
+enum DietType {
+  VEGAN
+  VEGETARIAN
+  EGGETARIAN
+  NON_VEGETARIAN
+}
+
+/// AVOID is a restriction and blocks recipes; LIKE only influences ranking.
+enum IngredientPrefKind {
+  AVOID
+  LIKE
+}
+
+enum RecipePrefKind {
+  FAVOURITE
+  DISLIKE
+}
+
 /// express-session storage used by connect-pg-simple. Declared here so migrations own it.
 model Session {
   sid    String   @id @db.VarChar
@@ -74,6 +115,9 @@ model User {
   transactions StockTransaction[]
   cookingEvents CookingEvent[]
   verifications InventoryVerification[]
+  foodProfile   UserFoodProfile?
+  ingredientPrefs UserIngredientPref[]
+  recipePrefs   UserRecipePref[]
 }
 
 model Household {
@@ -95,6 +139,7 @@ model Household {
   shoppingLists    ShoppingList[]
   verifications    InventoryVerification[]
   notifications    Notification[]
+  foodProfile      HouseholdFoodProfile?
 }
 
 model HouseholdMember {
@@ -119,12 +164,18 @@ model Ingredient {
   category       String               @default("Other")
   /// One of g, ml, count. Pantry and recipe quantities are stored in this unit.
   canonicalUnit  String
+  /// Null means not yet classified, so recipes using it have an unknown diet type.
+  dietClass      DietClass?
+  allergens      Allergen[]           @default([])
+  /// False until someone has checked the allergens. An empty list is only "no allergens" once reviewed.
+  allergensReviewed Boolean           @default(false)
   household      Household?           @relation(fields: [householdId], references: [id], onDelete: Cascade)
   pantryItems    PantryItem[]
   recipeLines    RecipeIngredient[]
   allocations    MealIngredientAllocation[]
   shoppingItems  ShoppingListItem[]
   stockTransactions StockTransaction[]
+  userPrefs      UserIngredientPref[]
   @@unique([householdId, nameKey])
   @@index([nameKey])
 }
@@ -163,12 +214,60 @@ model Recipe {
   cookMinutes  Int                @default(0)
   instructions String[]
   isShared     Boolean            @default(false)
+  cuisine      String             @default("")
+  /// 1 (mild) to 5 (very hot); null when not set.
+  spiceLevel   Int?
+  tags         String[]           @default([])
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   household    Household?         @relation(fields: [householdId], references: [id], onDelete: Cascade)
   ingredients  RecipeIngredient[]
   plannedMeals PlannedMeal[]
+  userPrefs    UserRecipePref[]
   @@index([householdId, name])
+}
+
+/// One person's food needs. Allergies and the diet type are hard rules; the rest only guides ranking.
+model UserFoodProfile {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  dietType  DietType?
+  allergens Allergen[] @default([])
+  /// Highest spice level the person enjoys, 1-5.
+  maxSpice  Int?
+  cuisines  String[]   @default([])
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserIngredientPref {
+  id           String             @id @default(cuid())
+  userId       String
+  ingredientId String
+  kind         IngredientPrefKind
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient         @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  @@unique([userId, ingredientId])
+}
+
+model UserRecipePref {
+  id       String         @id @default(cuid())
+  userId   String
+  recipeId String
+  kind     RecipePrefKind
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe   Recipe         @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  @@unique([userId, recipeId])
+}
+
+/// Household-wide defaults, set by the owner.
+model HouseholdFoodProfile {
+  id          String    @id @default(cuid())
+  householdId String    @unique
+  cuisines    String[]  @default([])
+  usualSpice  Int?
+  updatedAt   DateTime  @updatedAt
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
 
 model RecipeIngredient {

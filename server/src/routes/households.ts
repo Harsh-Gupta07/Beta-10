@@ -13,6 +13,7 @@ import { assistantRouter } from './assistant.js'
 import * as households from '../services/household.js'
 import { listNotifications, markAllRead } from '../services/notifications.js'
 import { getVerificationQueue } from '../services/verification.js'
+import * as foodPreferences from '../services/foodPreferences.js'
 import type { HouseholdRole } from '@prisma/client'
 import { env } from '../config/env.js'
 import { rateLimit } from '../lib/rateLimit.js'
@@ -68,6 +69,15 @@ householdRouter.post('/:householdId/notifications/read', requireHouseholdMember,
 
 householdRouter.get('/:householdId/verification', requireHouseholdMember, async (_req, res) => {
   res.json(await getVerificationQueue(hid(res)))
+})
+
+householdRouter.get('/:householdId/food-profile', requireHouseholdMember, async (_req, res) => {
+  res.json(await foodPreferences.getHouseholdFoodProfile(hid(res)))
+})
+
+householdRouter.put('/:householdId/food-profile', requireHouseholdMember, async (req, res) => {
+  const input = z.object({ cuisines: z.array(z.string().trim().min(1).max(40)).max(20).default([]), usualSpice: z.coerce.number().int().min(1).max(5).nullable().default(null) }).parse(req.body)
+  res.json(await foodPreferences.updateHouseholdFoodProfile(hid(res), role(res), input))
 })
 
 householdRouter.post('/', async (req, res, next) => {

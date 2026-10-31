@@ -17,6 +17,9 @@ const recipeInput = z.object({
   prepMinutes: z.coerce.number().int().min(0).max(1440).default(0),
   cookMinutes: z.coerce.number().int().min(0).max(1440).default(0),
   instructions: z.array(z.string().trim().max(1000)).max(40).default([]),
+  cuisine: z.string().trim().max(40).default(''),
+  spiceLevel: z.coerce.number().int().min(1).max(5).nullable().default(null),
+  tags: z.array(z.string().trim().min(1).max(24)).max(10).default([]),
   ingredients: z.array(z.object({
     ingredientId: z.string().min(1),
     quantity: z.union([z.number().positive(), z.string().trim().regex(/^\d+(\.\d+)?$/, 'Quantity must be a number.')]),
@@ -25,8 +28,11 @@ const recipeInput = z.object({
   })).min(1, 'Add at least one ingredient.').max(60),
 })
 
-recipeRouter.get('/recipes', async (_req, res) => {
-  res.json(await recipes.listRecipes(householdId(res)))
+recipeRouter.get('/recipes', async (req, res) => {
+  // ?safe=1 keeps only recipes that suit every member; "unknown" ones are left out too.
+  const { safe } = z.object({ safe: z.enum(['0', '1']).optional() }).parse(req.query)
+  const result = await recipes.listRecipes(householdId(res))
+  res.json(safe === '1' ? { ...result, recipes: result.recipes.filter(recipe => recipe.safety.status === 'SUITABLE') } : result)
 })
 
 recipeRouter.get('/recipes/:recipeId', async (req, res) => {

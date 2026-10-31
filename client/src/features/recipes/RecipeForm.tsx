@@ -4,6 +4,7 @@ import { api, errorMessage, type Ingredient, type InputUnit, type RecipeDetail, 
 import { useSession } from '../../lib/session'
 import { baseUnit, unitOptions } from '../../lib/format'
 import { Field, Modal, Notice, Spinner } from '../../components/ui'
+import { SPICE_LABEL } from '../../lib/food'
 
 type Line = { key: number; ingredientId: string; quantity: string; unit: InputUnit; note: string }
 type Props = { recipe?: RecipeDetail; draft?: RecipeDraft; categories: string[]; onClose: () => void; onSaved: (recipe: RecipeDetail) => void }
@@ -26,6 +27,9 @@ export function RecipeForm({ recipe, draft, categories, onClose, onSaved }: Prop
   const [prepMinutes, setPrepMinutes] = useState(String(source?.prepMinutes ?? 15))
   const [cookMinutes, setCookMinutes] = useState(String(source?.cookMinutes ?? 20))
   const [steps, setSteps] = useState(source?.instructions.join('\n') ?? '')
+  const [cuisine, setCuisine] = useState(recipe?.cuisine ?? '')
+  const [spiceLevel, setSpiceLevel] = useState(recipe?.spiceLevel ? String(recipe.spiceLevel) : '')
+  const [tags, setTags] = useState(recipe?.tags.join(', ') ?? '')
   const [lines, setLines] = useState<Line[]>(() => recipe
     ? recipe.ingredients.map(l => ({ key: nextKey++, ingredientId: l.ingredient.id, quantity: l.quantity, unit: baseUnit[l.unit], note: l.note }))
     : draft?.ingredients.length ? draft.ingredients.map(l => ({ key: nextKey++, ingredientId: l.ingredientId, quantity: l.quantity, unit: l.unit, note: l.note }))
@@ -60,6 +64,7 @@ export function RecipeForm({ recipe, draft, categories, onClose, onSaved }: Prop
     const body = {
       name, category, description, baseServings: Number(baseServings), prepMinutes: Number(prepMinutes || 0), cookMinutes: Number(cookMinutes || 0),
       instructions: steps.split('\n').map(s => s.trim()).filter(Boolean),
+      cuisine, spiceLevel: spiceLevel ? Number(spiceLevel) : null, tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       ingredients: filled.map(l => ({ ingredientId: l.ingredientId, quantity: l.quantity.trim(), unit: l.unit, note: l.note.trim() || undefined })),
     }
     try {
@@ -83,6 +88,14 @@ export function RecipeForm({ recipe, draft, categories, onClose, onSaved }: Prop
       <Field label="Serves"><input type="number" min={1} max={50} value={baseServings} onChange={e => setBaseServings(e.target.value)} required /></Field>
       <Field label="Prep time (min)"><input type="number" min={0} max={1440} value={prepMinutes} onChange={e => setPrepMinutes(e.target.value)} /></Field>
       <Field label="Cook time (min)"><input type="number" min={0} max={1440} value={cookMinutes} onChange={e => setCookMinutes(e.target.value)} /></Field>
+      <Field label="Cuisine"><input value={cuisine} onChange={e => setCuisine(e.target.value)} maxLength={40} placeholder="e.g. South Indian" /></Field>
+      <Field label="Spice level">
+        <select value={spiceLevel} onChange={e => setSpiceLevel(e.target.value)}>
+          <option value="">Not set</option>
+          {[1, 2, 3, 4, 5].map(level => <option key={level} value={level}>{level}: {SPICE_LABEL[level]}</option>)}
+        </select>
+      </Field>
+      <div className="full"><Field label="Tags" hint="Comma separated, e.g. quick, one-pot. Veg/non-veg and allergens are worked out from the ingredients."><input value={tags} onChange={e => setTags(e.target.value)} maxLength={250} placeholder="quick, comfort" /></Field></div>
       <div className="full"><Field label="Short description"><textarea rows={2} value={description} onChange={e => setDescription(e.target.value)} maxLength={500} placeholder="What makes this dish yours?" /></Field></div>
 
       <div className="full">

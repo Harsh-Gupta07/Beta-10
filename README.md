@@ -20,6 +20,7 @@ Phase 1 MVP status: all 10 modules work, and 47 automated tests pass.
   - [8. Ask the AI Assistant](#8-ask-the-ai-assistant)
   - [9. Household & Settings](#9-household--settings)
   - [10. Dashboard and notifications](#10-dashboard-and-notifications)
+  - [11. Food preferences and allergies](#11-food-preferences-and-allergies)
 - [A typical week: try this first](#a-typical-week-try-this-first)
 - [Key ideas to understand](#key-ideas-to-understand)
 - [Troubleshooting](#troubleshooting)
@@ -201,6 +202,25 @@ The **Dashboard** is your daily overview:
 
 The **bell** 🔔 (next to your household name, or in the mobile top bar) shows notifications, for example when recorded usage or a stock correction leaves a planned meal short. Click one to jump to the affected week.
 
+### 11. Food preferences and allergies
+
+Open **Food Preferences** in the menu. Each person fills in their own:
+
+- **Firm rules**: diet (vegan, vegetarian, eggetarian or non-veg), **allergies**, and ingredients they **never use** (e.g. onion and garlic). These are shown to the whole household so whoever cooks can respect them.
+- **Likes**: spice level, favourite cuisines, liked ingredients, favourite dishes and dishes they'd rather skip. These stay personal and will guide suggestions later.
+
+The owner can also set the household's **usual cuisines and spice level**.
+
+Every recipe then shows:
+
+- a **Vegan / Vegetarian / Eggetarian / Non-veg** badge, worked out from its ingredients
+- **"Not for …"** when it clashes with someone's allergy, diet or never-use list; the recipe page says who and why
+- **"Check ingredients"** when it uses an ingredient whose allergens nobody has checked yet (spice blends such as garam masala, or your own custom ingredients)
+
+Use **Safe for everyone** on the Recipes page to see only dishes that suit every member with fully checked ingredients. The AI Assistant also won't suggest dishes that clash.
+
+When you add a **custom ingredient** in the Pantry, say what it is and tick its allergens. Edit the pantry item to change them later. Built-in ingredients are tagged by KitchenSync. Always check packaged products' labels; tags describe typical ingredients, not every brand.
+
 ---
 
 ## A typical week: try this first
@@ -273,10 +293,11 @@ The free tier allows only a few requests per minute, and one question can take 2
 - **Concurrency.** Stock changes run in transactions with `SELECT … FOR UPDATE`.
 - **Household isolation.** Every route checks membership on the server; other households get 404.
 - **Audit trail.** Every stock change is an append-only `StockTransaction` with the balance after it.
+- **Allergy and diet checks are never guessed.** `server/src/services/foodSafety.ts` is a pure function: a recipe's diet type and allergens come from its ingredients' tags, and an untagged or unchecked ingredient makes the answer "unknown", never "safe". It is computed on every read, so removing a member or retagging an ingredient takes effect immediately. The assistant receives the reasons without members' names.
 
 ### Tests
 
-`npm test` runs 47 tests against a real PostgreSQL database: unit conversion and scaling, the allocation engine (including the brief's rice example), pantry, recipes, planner, cooking (double and simultaneous completion), shopping (partial delivery, double receipt), verification and notifications, invites and permissions, the assistant's offline mode, and the brief's full integration journey (`server/src/routes/journey.test.ts`).
+`npm test` runs 73 tests against a real PostgreSQL database: unit conversion and scaling, the allocation engine (including the brief's rice example), food safety and preferences, release hardening, pantry, recipes, planner, cooking (double and simultaneous completion), shopping (partial delivery, double receipt), verification and notifications, invites and permissions, the assistant's offline mode, and the brief's full integration journey (`server/src/routes/journey.test.ts`).
 
 1. Create a test database: `CREATE DATABASE kitchensync_test OWNER kitchensync;`
 2. Set `TEST_DATABASE_URL` in `server/.env`. Its name must contain `test`.

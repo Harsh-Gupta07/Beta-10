@@ -4,6 +4,7 @@ import { api, errorMessage, type CanonicalUnit, type Confidence, type Ingredient
 import { useSession } from '../../lib/session'
 import { baseUnit, toDateInput, unitOptions } from '../../lib/format'
 import { Field, Modal, Notice, Segmented, Spinner } from '../../components/ui'
+import { FoodTagFields, untagged, type FoodTags } from './FoodTagFields'
 
 const confidenceOptions: Array<{ value: Confidence; label: string }> = [
   { value: 'CONFIRMED', label: 'Confirmed' }, { value: 'ESTIMATED', label: 'Estimated' }, { value: 'CHECK_NEEDED', label: 'Check needed' },
@@ -28,6 +29,8 @@ export function PantryItemForm({ item, existingIngredientIds, onClose, onSaved }
   const [source, setSource] = useState<'MANUAL' | 'PURCHASE'>('MANUAL')
   const [purchasedAt, setPurchasedAt] = useState(toDateInput(item?.purchasedAt ?? null))
   const [expiresAt, setExpiresAt] = useState(toDateInput(item?.expiresAt ?? null))
+  const ownIngredient = item?.ingredient.custom ? item.ingredient : null
+  const [tags, setTags] = useState<FoodTags>(ownIngredient ? { dietClass: ownIngredient.dietClass, allergens: ownIngredient.allergens, allergensReviewed: ownIngredient.allergensReviewed } : untagged)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -53,12 +56,13 @@ export function PantryItemForm({ item, existingIngredientIds, onClose, onSaved }
     const lowStockThreshold = threshold === '' ? null : threshold
     try {
       if (item) {
+        if (ownIngredient) await api.patch(`/households/${household.id}/ingredients/${ownIngredient.id}`, tags)
         const { data } = await api.patch<PantryItem>(`/households/${household.id}/pantry/${item.id}`, { quantity, unit, lowStockThreshold, confidence, ...dates })
         onSaved(data)
       } else {
         let ingredientId = ingredient?.id
         if (!ingredientId && custom) {
-          const created = await api.post<Ingredient>(`/households/${household.id}/ingredients`, custom)
+          const created = await api.post<Ingredient>(`/households/${household.id}/ingredients`, { ...custom, ...tags })
           ingredientId = created.data.id
           setIngredient(created.data); setCustom(null)
         }
@@ -93,6 +97,7 @@ export function PantryItemForm({ item, existingIngredientIds, onClose, onSaved }
           <select value={custom.canonicalUnit} onChange={e => setCustom({ ...custom, canonicalUnit: e.target.value as CanonicalUnit })}>{familyOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
         </Field>
       </>}
+      {(custom || ownIngredient) && <FoodTagFields value={tags} onChange={setTags} />}
 
       <Field label="Quantity on hand">
         <div className="quantity-input"><input value={quantity} onChange={e => setQuantity(e.target.value)} inputMode="decimal" required pattern="\d+(\.\d+)?" title="A number, e.g. 500 or 1.5" placeholder="0" />

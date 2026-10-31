@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { CANONICAL_UNITS, INPUT_UNITS } from '../services/units.js'
 import * as pantry from '../services/pantry.js'
+import { ALLERGENS } from '../services/foodSafety.js'
 
 // Mounted under /households/:householdId, after requireUser + requireHouseholdMember.
 export const pantryRouter = Router({ mergeParams: true })
@@ -19,9 +20,21 @@ pantryRouter.get('/ingredients', async (_req, res) => {
   res.json(await pantry.listIngredients(ctx(res).householdId))
 })
 
+const foodTags = {
+  dietClass: z.enum(['PLANT', 'DAIRY', 'EGG', 'MEAT', 'SEAFOOD']).nullable().optional(),
+  allergens: z.array(z.enum(ALLERGENS)).max(ALLERGENS.length).optional(),
+  allergensReviewed: z.boolean().optional(),
+}
+
 pantryRouter.post('/ingredients', async (req, res) => {
-  const input = z.object({ name: z.string().trim().min(2).max(60), category: z.string().trim().max(40).default('Other'), canonicalUnit: z.enum(CANONICAL_UNITS) }).parse(req.body)
+  const input = z.object({ name: z.string().trim().min(2).max(60), category: z.string().trim().max(40).default('Other'), canonicalUnit: z.enum(CANONICAL_UNITS), ...foodTags }).parse(req.body)
   res.status(201).json(await pantry.createIngredient(ctx(res).householdId, input))
+})
+
+// Only the household's own ingredients can be tagged; the built-in catalog is maintained in the seed.
+pantryRouter.patch('/ingredients/:ingredientId', async (req, res) => {
+  const input = z.object(foodTags).parse(req.body)
+  res.json(await pantry.tagIngredient(ctx(res).householdId, String(req.params.ingredientId), input))
 })
 
 pantryRouter.get('/pantry', async (_req, res) => {

@@ -1,0 +1,31 @@
+import { Router } from 'express'
+import { z } from 'zod'
+import { requireUser } from '../middleware/auth.js'
+import { ALLERGENS, DIET_TYPES } from '../services/foodSafety.js'
+import * as preferences from '../services/foodPreferences.js'
+
+// Things that belong to the signed-in person rather than to their household.
+export const meRouter = Router()
+meRouter.use(requireUser)
+
+const userId = (res: { locals: Record<string, unknown> }) => (res.locals.user as { id: string }).id
+const ids = z.array(z.string().min(1).max(40)).max(100).default([])
+
+const preferencesInput = z.object({
+  dietType: z.enum(DIET_TYPES).nullable().default(null),
+  allergens: z.array(z.enum(ALLERGENS)).max(ALLERGENS.length).default([]),
+  maxSpice: z.coerce.number().int().min(1).max(5).nullable().default(null),
+  cuisines: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
+  avoidIngredientIds: ids,
+  likedIngredientIds: ids,
+  favouriteRecipeIds: ids,
+  dislikedRecipeIds: ids,
+})
+
+meRouter.get('/food-preferences', async (_req, res) => {
+  res.json(await preferences.getMyPreferences(userId(res)))
+})
+
+meRouter.put('/food-preferences', async (req, res) => {
+  res.json(await preferences.updateMyPreferences(userId(res), preferencesInput.parse(req.body)))
+})

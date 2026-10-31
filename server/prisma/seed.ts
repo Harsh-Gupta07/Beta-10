@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client'
-import { recipes } from './recipes.data.js'
+import { PrismaClient, type Allergen, type DietClass } from '@prisma/client'
+import { recipeTags, recipes } from './recipes.data.js'
 
 const prisma = new PrismaClient()
 
@@ -20,15 +20,32 @@ const ingredients: Array<[name: string, category: string, canonicalUnit: 'g' | '
   ['Oil', 'Oils & Essentials', 'ml'], ['Sugar', 'Oils & Essentials', 'g'], ['Peanuts', 'Oils & Essentials', 'g'], ['Tea leaves', 'Oils & Essentials', 'g'],
 ]
 
+// Anything not listed is a plain plant food with no allergens, and counts as reviewed.
+const foodTags: Record<string, { dietClass: DietClass; allergens: Allergen[]; reviewed?: false }> = {
+  'Milk': { dietClass: 'DAIRY', allergens: ['MILK'] }, 'Curd': { dietClass: 'DAIRY', allergens: ['MILK'] },
+  'Paneer': { dietClass: 'DAIRY', allergens: ['MILK'] }, 'Ghee': { dietClass: 'DAIRY', allergens: ['MILK'] },
+  'Butter': { dietClass: 'DAIRY', allergens: ['MILK'] }, 'Eggs': { dietClass: 'EGG', allergens: ['EGG'] },
+  'Wheat flour (atta)': { dietClass: 'PLANT', allergens: ['GLUTEN'] }, 'Semolina (rava)': { dietClass: 'PLANT', allergens: ['GLUTEN'] },
+  'Peanuts': { dietClass: 'PLANT', allergens: ['PEANUT'] }, 'Mustard seeds': { dietClass: 'PLANT', allergens: ['MUSTARD'] },
+  // Most packaged hing is cut with wheat flour.
+  'Asafoetida (hing)': { dietClass: 'PLANT', allergens: ['GLUTEN'] },
+  // Spice blends vary by brand (some contain nuts, mustard or wheat), so they stay unreviewed until checked.
+  // "Oil" means refined cooking oil, which is exempt from allergen labelling; households using peanut or
+  // mustard oil should add it as their own ingredient and tag it.
+  'Garam masala': { dietClass: 'PLANT', allergens: [], reviewed: false }, 'Chole masala': { dietClass: 'PLANT', allergens: [], reviewed: false },
+}
+
 async function main() {
   for (const [name, category, canonicalUnit] of ingredients) {
     const nameKey = name.toLowerCase()
+    const tags = foodTags[name]
+    const food = { dietClass: tags?.dietClass ?? 'PLANT', allergens: tags?.allergens ?? [], allergensReviewed: tags?.reviewed ?? true }
     const existing = await prisma.ingredient.findFirst({ where: { householdId: null, nameKey } })
     if (existing) {
       if (existing.canonicalUnit !== canonicalUnit) console.warn(`Keeping ${name} in ${existing.canonicalUnit}; seed says ${canonicalUnit}. Changing units of existing stock needs a data migration.`)
-      await prisma.ingredient.update({ where: { id: existing.id }, data: { name, category } })
+      await prisma.ingredient.update({ where: { id: existing.id }, data: { name, category, ...food } })
     } else {
-      await prisma.ingredient.create({ data: { name, nameKey, category, canonicalUnit } })
+      await prisma.ingredient.create({ data: { name, nameKey, category, canonicalUnit, ...food } })
     }
   }
   console.log(`Seeded ${ingredients.length} canonical ingredients.`)
@@ -42,7 +59,8 @@ async function main() {
       if (ingredient.canonicalUnit === 'count' && !Number.isInteger(quantity)) throw new Error(`Recipe "${recipe.name}": ${name} must be a whole number.`)
       return { ingredientId: ingredient.id, quantity, unit: ingredient.canonicalUnit, note: note ?? '', position }
     })
-    const data = { name: recipe.name, description: recipe.description, category: recipe.category, baseServings: recipe.baseServings, prepMinutes: recipe.prepMinutes, cookMinutes: recipe.cookMinutes, instructions: recipe.instructions, isShared: true }
+    const tags = recipeTags[recipe.name] ?? { cuisine: '', spiceLevel: null, tags: [] }
+    const data = { name: recipe.name, description: recipe.description, category: recipe.category, baseServings: recipe.baseServings, prepMinutes: recipe.prepMinutes, cookMinutes: recipe.cookMinutes, instructions: recipe.instructions, isShared: true, ...tags }
     const existing = await prisma.recipe.findFirst({ where: { householdId: null, name: recipe.name } })
     await prisma.$transaction(async tx => {
       const saved = existing ? await tx.recipe.update({ where: { id: existing.id }, data }) : await tx.recipe.create({ data })

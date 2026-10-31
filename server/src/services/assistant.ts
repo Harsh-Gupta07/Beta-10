@@ -3,6 +3,7 @@ import { env } from '../config/env.js'
 import { prisma } from '../lib/prisma.js'
 import { listIngredients, listPantry } from './pantry.js'
 import { getRecipe, listRecipes } from './recipes.js'
+import type { SafetyStatus } from './foodSafety.js'
 import { getWeek } from './planner.js'
 import { localToday } from './dates.js'
 import { describeQuantity, INPUT_UNITS, isCanonicalUnit, toCanonical, unitsFor, type InputUnit } from './units.js'
@@ -85,6 +86,15 @@ const toolDeclarations = [
   }, required: ['name', 'servings', 'ingredients', 'steps'] } },
 ]
 
+/** What the AI may know about a recipe's fit: reasons only, never which member they belong to. */
+function suitability(safety: { status: SafetyStatus; conflicts: Array<{ reason: string }>; uncertain: string[] }) {
+  return {
+    suitability: safety.status.toLowerCase(),
+    ...(safety.conflicts.length ? { avoid_because: [...new Set(safety.conflicts.map(c => c.reason))] } : {}),
+    ...(safety.status === 'UNKNOWN' ? { unchecked: safety.uncertain } : {}),
+  }
+}
+
 async function findRecipeId(householdId: string, name: string) {
   const { recipes } = await listRecipes(householdId)
   const key = name.trim().toLowerCase()
@@ -101,7 +111,7 @@ async function runTool(name: string, args: Record<string, any>, ctx: Context): P
     case 'get_recipes': {
       const { recipes, servings } = await listRecipes(householdId)
       const q = String(args.search ?? '').toLowerCase()
-      return { usual_servings: servings, recipes: recipes.filter(r => !q || r.name.toLowerCase().includes(q) || r.category.toLowerCase().includes(q)).map(r => ({ name: r.name, category: r.category, minutes: r.prepMinutes + r.cookMinutes, missing_count: r.missingCount, ingredient_count: r.ingredientCount })) }
+      return { usual_servings: servings, recipes: recipes.filter(r => !q || r.name.toLowerCase().includes(q) || r.category.toLowerCase().includes(q)).map(r => ({ name: r.name, category: r.category, minutes: r.prepMinutes + r.cookMinutes, missing_count: r.missingCount, ingredient_count: r.ingredientCount, ...suitability(r.safety) })) }
     }
     case 'get_recipe': {
       const id = await findRecipeId(householdId, String(args.recipe_name ?? ''))
@@ -110,7 +120,7 @@ async function runTool(name: string, args: Record<string, any>, ctx: Context): P
       const recipe = await getRecipe(householdId, id, servings)
       return { name: recipe.name, servings: recipe.servings, written_for: recipe.baseServings, minutes: recipe.prepMinutes + recipe.cookMinutes,
         ingredients: recipe.ingredients.map(l => ({ name: l.ingredient.name, quantity: describeQuantity(l.quantity, l.unit), in_pantry: l.inPantry === null ? 'none' : describeQuantity(l.inPantry, l.unit), enough: l.enough, short_by: l.enough ? null : describeQuantity(l.missing, l.unit) })),
-        steps: recipe.instructions }
+        steps: recipe.instructions, ...suitability(recipe.safety) }
     }
     case 'find_recipes_using': {
       const wanted = (Array.isArray(args.ingredients) ? args.ingredients : []).map((n: unknown) => resolveIngredient(String(n), ctx.ingredients).match).filter(Boolean) as Ingredient[]
@@ -120,7 +130,7 @@ async function runTool(name: string, args: Record<string, any>, ctx: Context): P
       const matches = new Map<string, number>()
       for (const line of lines) matches.set(line.recipeId, (matches.get(line.recipeId) ?? 0) + 1)
       return { searched_for: wanted.map(w => w.name), recipes: recipes.filter(r => matches.has(r.id)).sort((a, b) => matches.get(b.id)! - matches.get(a.id)! || a.missingCount - b.missingCount)
-        .slice(0, 8).map(r => ({ name: r.name, uses: matches.get(r.id), missing_from_pantry: r.missingCount, minutes: r.prepMinutes + r.cookMinutes })) }
+        .slice(0, 8).map(r => ({ name: r.name, uses: matches.get(r.id), missing_from_pantry: r.missingCount, minutes: r.prepMinutes + r.cookMinutes, ...suitability(r.safety) })) }
     }
     case 'get_meal_plan': {
       const date = typeof args.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.date) ? args.date : undefined
@@ -216,6 +226,7 @@ function systemPrompt(household: { name: string; defaultServings: number; timezo
     '- Units must be g, kg, ml, l or pcs. If the user says packets, cups, bowls, handfuls or similar, ask what that is in a real unit (e.g. "How many ml is one packet?") before proposing anything.',
     '- If an ingredient name is ambiguous or unknown, ask the user to choose.',
     '- When explaining a shortage, name only the ingredients the tools report as short, with their short_by amounts, and mention that earlier meals are served first. Do not claim the pantry is empty unless get_pantry shows that.',
+    '- Each recipe has a suitability from the tools. Never suggest a "conflict" recipe; if the user asks for one, explain the avoid_because reasons. For "unknown", mention what is unchecked. Never decide yourself whether a dish is safe for an allergy.',
     '- Be concise and friendly. Use short paragraphs or bullet points. Use the household’s usual servings unless told otherwise.',
   ].join('\n')
 }
@@ -230,7 +241,9 @@ async function fallbackReply(householdId: string, message: string, reason: strin
     const lines = week.shortages.slice(0, 6).map(s => `• ${s.ingredient.name}: short ${describeQuantity(s.shortage, s.unit)} (first needed for ${s.firstAffected.recipeName}, ${s.firstAffected.slot.toLowerCase()} on ${s.firstAffected.date})`)
     return `${intro}\n\n${lines.length ? `Upcoming shortages:\n${lines.join('\n')}\n\nOpen the Shopping list to add them in one tap.` : 'Your pantry covers every upcoming planned meal.'}`
   }
-  const { recipes, servings } = await listRecipes(householdId)
+  const { recipes: all, servings } = await listRecipes(householdId)
+  // Dishes that clash with a member's allergy or diet are never suggested.
+  const recipes = all.filter(r => r.safety.status !== 'CONFLICT')
   const ready = recipes.filter(r => r.missingCount === 0)
   const close = [...recipes].sort((a, b) => a.missingCount - b.missingCount).slice(0, 3)
   if (/cook|make|suggest|dinner|lunch|breakfast|eat|recipe/.test(text)) {

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, Clock, Copy, Minus, PencilLine, Plus, Trash2, TriangleAlert, Users } from 'lucide-react'
+import { ArrowLeft, Check, Clock, Copy, Flame, Minus, PencilLine, Plus, Trash2, TriangleAlert, Users } from 'lucide-react'
 import { api, errorMessage, type RecipeDetail } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatQuantity } from '../../lib/format'
 import { Badge, Modal, Notice, Spinner } from '../../components/ui'
 import { RecipeForm } from './RecipeForm'
+import { DietBadge, SafetyPanel } from './RecipeSafety'
+import { ALLERGEN_LABEL, SPICE_LABEL } from '../../lib/food'
 
 export function RecipeDetailPage() {
   const { recipeId } = useParams()
@@ -61,7 +63,10 @@ export function RecipeDetailPage() {
         <div className="recipe-meta large">
           <span><Clock size={15} aria-hidden />Prep {recipe.prepMinutes} min · Cook {recipe.cookMinutes} min</span>
           <span><Users size={15} aria-hidden />Written for {recipe.baseServings}</span>
+          {recipe.cuisine && <span>{recipe.cuisine}</span>}
+          {recipe.spiceLevel && <span><Flame size={15} aria-hidden />{SPICE_LABEL[recipe.spiceLevel]}</span>}
         </div>
+        <div className="badge-row"><DietBadge recipe={recipe} />{recipe.tags.map(tag => <Badge key={tag} tone="grey">{tag}</Badge>)}</div>
       </div>
       <div className="header-actions">
         {recipe.custom
@@ -70,6 +75,7 @@ export function RecipeDetailPage() {
       </div>
     </header>
     {actionError && <Notice>{actionError}</Notice>}
+    <SafetyPanel recipe={recipe} />
 
     <section className="recipe-layout">
       <article className="panel">
@@ -88,7 +94,8 @@ export function RecipeDetailPage() {
         </div>
         <ul className="ingredient-table">
           {recipe.ingredients.map(line => <li key={line.ingredient.id}>
-            <span className="ing-name"><strong>{line.ingredient.name}</strong>{line.note && <small>{line.note}</small>}</span>
+            <span className="ing-name"><strong>{line.ingredient.name}</strong>{line.note && <small>{line.note}</small>}
+              {line.allergens.length > 0 && <small className="allergen-note">Contains {line.allergens.map(a => ALLERGEN_LABEL[a].toLowerCase()).join(', ')}</small>}</span>
             <span className="ing-qty">{formatQuantity(line.quantity, line.unit)}</span>
             <span className="ing-status">{line.enough
               ? <Badge tone="green">In pantry</Badge>

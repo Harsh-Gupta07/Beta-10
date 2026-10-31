@@ -187,3 +187,23 @@ export const recipes: SeedRecipe[] = [
     ],
   },
 ]
+
+// Cuisine, spice level (1 mild - 5 very hot) and tags for the shared recipes, by name.
+// Diet type and allergens are not listed here: they are derived from the ingredients.
+export const recipeTags: Record<string, { cuisine: string; spiceLevel: number; tags: string[] }> = {
+  'Dal Tadka': { cuisine: 'North Indian', spiceLevel: 2, tags: ['everyday', 'comfort'] },
+  'Rajma Chawal': { cuisine: 'Punjabi', spiceLevel: 3, tags: ['hearty', 'weekend'] },
+  'Kanda Batata Poha': { cuisine: 'Maharashtrian', spiceLevel: 2, tags: ['quick', 'light'] },
+  'Vegetable Pulao': { cuisine: 'North Indian', spiceLevel: 2, tags: ['one-pot'] },
+  'Paneer Bhurji': { cuisine: 'North Indian', spiceLevel: 3, tags: ['quick', 'high-protein'] },
+  'Aloo Paratha': { cuisine: 'Punjabi', spiceLevel: 2, tags: ['hearty', 'weekend'] },
+  'Moong Dal Khichdi': { cuisine: 'North Indian', spiceLevel: 1, tags: ['comfort', 'light', 'one-pot'] },
+  'Aloo Gobi with Roti': { cuisine: 'North Indian', spiceLevel: 3, tags: ['everyday'] },
+  'Rava Upma': { cuisine: 'South Indian', spiceLevel: 1, tags: ['quick', 'light'] },
+  'Chole': { cuisine: 'Punjabi', spiceLevel: 4, tags: ['hearty', 'weekend'] },
+  'Palak Paneer': { cuisine: 'North Indian', spiceLevel: 2, tags: ['high-protein'] },
+  'Masoor Dal': { cuisine: 'North Indian', spiceLevel: 2, tags: ['everyday', 'quick'] },
+  'Besan Chilla': { cuisine: 'North Indian', spiceLevel: 2, tags: ['quick', 'high-protein'] },
+  'Masala Chai': { cuisine: 'Indian', spiceLevel: 1, tags: ['beverage'] },
+  'Egg Bhurji': { cuisine: 'North Indian', spiceLevel: 3, tags: ['quick', 'high-protein'] },
+}

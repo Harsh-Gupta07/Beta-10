@@ -11,6 +11,7 @@ import { AppError } from './lib/errors.js'
 import { prisma } from './lib/prisma.js'
 import { authRouter } from './routes/auth.js'
 import { householdRouter } from './routes/households.js'
+import { meRouter } from './routes/me.js'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
@@ -85,6 +86,7 @@ export function createApp() {
   })
   app.use('/api/v1/auth', authRouter)
   app.use('/api/v1/households', householdRouter)
+  app.use('/api/v1/me', meRouter)
 
   if (env.SERVE_CLIENT) {
     const dist = path.resolve(process.cwd(), env.CLIENT_DIST_DIR)
