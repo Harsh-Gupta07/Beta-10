@@ -68,7 +68,9 @@ npm install
 
 Keep the terminal open while using the app. Press `Ctrl+C` to stop it, and run `npm run dev` to start it again.
 
-**After pulling new changes** from GitHub, always run `npm install`, `npm run db:migrate` and `npm run db:seed` before `npm run dev`.
+**After pulling new changes** from GitHub, run `npm install` and then `npm run dev`. Before starting, `npm run dev` brings everything up to date by itself: it applies new database migrations, regenerates the Prisma client and refreshes the ingredient catalog and recipes (your household data is never touched). To do only that step, run `npm run db:setup`.
+
+**Sign-in fails with a server error on a new or freshly pulled computer?** Look at the terminal running `npm run dev`. The `[setup]` lines say what's wrong: usually PostgreSQL isn't running or `DATABASE_URL` in `server/.env` is wrong. If it mentions the Prisma client, close every other terminal running KitchenSync and run `npm run dev` again.
 
 ### Continue with Google
 

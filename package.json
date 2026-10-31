@@ -21,7 +21,8 @@
     "start": "npm --workspace server run start",
     "db:deploy": "npm --workspace server run db:deploy",
     "db:seed:prod": "npm --workspace server run db:seed:prod",
-    "build:deploy": "npm --workspace server run build:deploy && npm --workspace client run build"
+    "build:deploy": "npm --workspace server run build:deploy && npm --workspace client run build",
+    "db:setup": "npm --workspace server run db:setup"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
