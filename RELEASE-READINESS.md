@@ -149,6 +149,8 @@ All on `release/phase-1.1-readiness`.
 | Tests | 7 security regression tests; test client supports `Origin` and raw bodies | `server/src/routes/security.test.ts`, `server/src/test/helpers.ts`, `server/scripts/run-tests.ts` |
 | Docs | Staging settings in `.env.example`; this report | `server/.env.example`, `RELEASE-READINESS.md` |
 
+**Regression caught during verification:** the new Origin check (M-1) initially blocked sign-in on the dev server when the app was opened via `127.0.0.1` or a LAN IP. Vite's proxy shorthand sets `changeOrigin: true`, which rewrites `Host`. The fix sets `changeOrigin: false` in `client/vite.config.ts`. Re-verified on `localhost`, `127.0.0.1` and the LAN IP: sign-in returns 200 on all three, and foreign-origin writes return 403 on all three.
+
 Investigated and **not** changed: notifications after stock decreases. I suspected repeated alerts, but analysis showed they fire only when an ingredient's shortage actually grows, so the original behaviour is correct.
 
 ## 8. Remaining risks
