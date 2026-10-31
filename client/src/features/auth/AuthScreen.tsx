@@ -24,7 +24,25 @@ export function AuthScreen({ onSignedIn, error }: { onSignedIn: () => Promise<vo
   const [phoneOpen, setPhoneOpen] = useState(false)
   const register = mode === 'register'
 
-  useEffect(() => { api.get<Providers>('/auth/providers').then(r => setProviders(r.data)).catch(() => setProviders({ google: null, apple: null })) }, [])
+  // If the server is down (e.g. restarting), keep checking quietly; once it answers, clear the old error.
+  useEffect(() => {
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
+    const check = async (attempt: number) => {
+      try {
+        const { data } = await api.get<Providers>('/auth/providers')
+        if (cancelled) return
+        setProviders(data)
+        if (attempt > 0 || error) void onSignedIn()
+      } catch {
+        if (cancelled) return
+        setProviders(current => current ?? { google: null, apple: null })
+        if (attempt < 20) timer = setTimeout(() => void check(attempt + 1), 3000)
+      }
+    }
+    void check(0)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- runs once per visit to the sign-in page
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setMessage(''); setBusy('email')

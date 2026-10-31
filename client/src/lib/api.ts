@@ -15,6 +15,8 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
     // No API error body means something in between answered (dev proxy, gateway): say so instead of hiding it.
     if (data?.error) return data.error
     if (error.response.status === 429) return 'Too many requests. Please wait a moment and try again.'
+    // A bare 500/502/503/504 comes from a proxy or gateway while the server is down or restarting.
+    if (error.response.status >= 500) return 'KitchenSync’s server isn’t answering right now. It may be restarting; please try again in a few seconds.'
     return import.meta.env.DEV
       ? `${fallback} The server responded with ${error.response.status} ${error.response.statusText}; check that the API is running and restart \`npm run dev\`.`
       : `${fallback} (server error ${error.response.status})`
