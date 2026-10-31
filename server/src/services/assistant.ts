@@ -4,6 +4,8 @@ import { prisma } from '../lib/prisma.js'
 import { listIngredients, listPantry } from './pantry.js'
 import { getRecipe, listRecipes } from './recipes.js'
 import type { SafetyStatus } from './foodSafety.js'
+import { getSuggestions } from './suggestions.js'
+import type { MealSlot } from '@prisma/client'
 import { getWeek } from './planner.js'
 import { localToday } from './dates.js'
 import { describeQuantity, INPUT_UNITS, isCanonicalUnit, toCanonical, unitsFor, type InputUnit } from './units.js'
@@ -75,6 +77,7 @@ const toolDeclarations = [
   { name: 'get_pantry', description: 'List every ingredient in the household pantry with quantity, stock status (OK/LOW/OUT), confidence and expiry.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'get_recipes', description: 'List available recipes with category, time, and how many ingredients the pantry is missing at the household’s usual servings (missing_count 0 = can cook now).', parameters: { type: 'OBJECT', properties: { search: { ...STR, description: 'Optional text to filter by name or category' } } } },
   { name: 'get_recipe', description: 'Get one recipe scaled to a number of servings, with each ingredient quantity and whether the pantry has enough. Use this for "how much X do I need for N people".', parameters: { type: 'OBJECT', properties: { recipe_name: STR, servings: { ...NUM, description: 'Defaults to the household’s usual servings' } }, required: ['recipe_name'] } },
+  { name: 'get_suggestions', description: 'What the household should cook next: dishes ranked by KitchenSync from unreserved pantry stock, what was eaten recently, favourites and dislikes. Dishes that clash with anyone’s allergy or diet are already removed. Use this for "what should we cook/eat" questions.', parameters: { type: 'OBJECT', properties: { slot: { ...STR, description: 'Optional: BREAKFAST, LUNCH or DINNER' } } } },
   { name: 'find_recipes_using', description: 'Rank recipes that use the given ingredients, best pantry coverage first.', parameters: { type: 'OBJECT', properties: { ingredients: { type: 'ARRAY', items: STR } }, required: ['ingredients'] } },
   { name: 'get_meal_plan', description: 'Get the planned meals for the week containing a date, each with per-ingredient required, reserved and short quantities, plus all upcoming shortages. Use this to explain shortages.', parameters: { type: 'OBJECT', properties: { date: { ...STR, description: 'YYYY-MM-DD; defaults to today' } } } },
   { name: 'propose_pantry_addition', description: 'Propose adding stock the user says they have or bought. Does NOT change anything; the user confirms with a button. Only call with a concrete quantity in g, kg, ml, l or pcs.', parameters: { type: 'OBJECT', properties: { ingredient_name: STR, quantity: NUM, unit: { ...STR, description: 'g, kg, ml, l or pcs' } }, required: ['ingredient_name', 'quantity', 'unit'] } },
@@ -121,6 +124,15 @@ async function runTool(name: string, args: Record<string, any>, ctx: Context): P
       return { name: recipe.name, servings: recipe.servings, written_for: recipe.baseServings, minutes: recipe.prepMinutes + recipe.cookMinutes,
         ingredients: recipe.ingredients.map(l => ({ name: l.ingredient.name, quantity: describeQuantity(l.quantity, l.unit), in_pantry: l.inPantry === null ? 'none' : describeQuantity(l.inPantry, l.unit), enough: l.enough, short_by: l.enough ? null : describeQuantity(l.missing, l.unit) })),
         steps: recipe.instructions, ...suitability(recipe.safety) }
+    }
+    case 'get_suggestions': {
+      const slot = ['BREAKFAST', 'LUNCH', 'DINNER'].includes(String(args.slot).toUpperCase()) ? String(args.slot).toUpperCase() as MealSlot : null
+      const result = await getSuggestions(householdId, '', { slot, scope: 'household', limit: 5 })
+      return {
+        suggestions: result.suggestions.map(s => ({ name: s.recipe.name, minutes: s.recipe.prepMinutes + s.recipe.cookMinutes, missing_from_free_stock: s.recipe.missingCount, why: s.reasons.map(r => r.anonymous) })),
+        ...(result.hasHistory ? {} : { note: 'No eating history yet, so recency is not considered.' }),
+        dishes_left_out_for_allergies_or_diet: result.excludedForSafety,
+      }
     }
     case 'find_recipes_using': {
       const wanted = (Array.isArray(args.ingredients) ? args.ingredients : []).map((n: unknown) => resolveIngredient(String(n), ctx.ingredients).match).filter(Boolean) as Ingredient[]
@@ -227,6 +239,7 @@ function systemPrompt(household: { name: string; defaultServings: number; timezo
     '- If an ingredient name is ambiguous or unknown, ask the user to choose.',
     '- When explaining a shortage, name only the ingredients the tools report as short, with their short_by amounts, and mention that earlier meals are served first. Do not claim the pantry is empty unless get_pantry shows that.',
     '- Each recipe has a suitability from the tools. Never suggest a "conflict" recipe; if the user asks for one, explain the avoid_because reasons. For "unknown", mention what is unchecked. Never decide yourself whether a dish is safe for an allergy.',
+    '- For "what should we cook/eat" questions, call get_suggestions and present its top dishes with their "why" reasons. Do not re-rank them or invent reasons such as health benefits.',
     '- Be concise and friendly. Use short paragraphs or bullet points. Use the household’s usual servings unless told otherwise.',
   ].join('\n')
 }

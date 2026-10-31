@@ -51,8 +51,22 @@ async function computeAllocation(householdId: string, today: DateString) {
     mealId: meal.id, date: fromDbDate(meal.date), slot: meal.slot, createdAt: meal.createdAt,
     lines: requirements(meal).map(line => { ingredients.set(line.ingredient.id, line.ingredient); return { ingredientId: line.ingredient.id, quantity: line.quantity } }),
   }))
-  const result = allocate(new Map(pantry.map(item => [item.ingredientId, item.quantity])), demands)
-  return { meals, result, ingredients }
+  const onHand = new Map(pantry.map(item => [item.ingredientId, item.quantity]))
+  const result = allocate(onHand, demands)
+  return { meals, result, ingredients, onHand }
+}
+
+/**
+ * What a new dish could use without taking anything already reserved for upcoming meals,
+ * plus which recipes are already planned from today on.
+ */
+export async function kitchenOutlook(householdId: string) {
+  const { timezone } = await household(householdId)
+  const today = localToday(timezone)
+  const { meals, result, onHand } = await computeAllocation(householdId, today)
+  const free = new Map(onHand)
+  for (const position of result.byIngredient.values()) free.set(position.ingredientId, position.unallocated)
+  return { today, free, upcoming: meals.map(meal => ({ recipeId: meal.recipe.id, date: fromDbDate(meal.date) })) }
 }
 
 function serializeMeal(meal: MealRow, result: AllocationResult, today: DateString) {

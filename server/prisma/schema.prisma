@@ -118,6 +118,9 @@ model User {
   foodProfile   UserFoodProfile?
   ingredientPrefs UserIngredientPref[]
   recipePrefs   UserRecipePref[]
+  eatenLogs     EatenLog[]
+  absences      MealAbsence[]
+  snoozes       RecommendationSnooze[]
 }
 
 model Household {
@@ -140,6 +143,8 @@ model Household {
   verifications    InventoryVerification[]
   notifications    Notification[]
   foodProfile      HouseholdFoodProfile?
+  eatenLogs        EatenLog[]
+  snoozes          RecommendationSnooze[]
 }
 
 model HouseholdMember {
@@ -224,6 +229,8 @@ model Recipe {
   ingredients  RecipeIngredient[]
   plannedMeals PlannedMeal[]
   userPrefs    UserRecipePref[]
+  eatenLogs    EatenLog[]
+  snoozes      RecommendationSnooze[]
   @@index([householdId, name])
 }
 
@@ -309,8 +316,53 @@ model PlannedMeal {
   recipe      Recipe                    @relation(fields: [recipeId], references: [id], onDelete: Restrict)
   allocations MealIngredientAllocation[]
   cookingEvent CookingEvent?
+  absences    MealAbsence[]
   @@unique([mealPlanId, date, slot])
   @@index([date, status])
+}
+
+/// A meal eaten without being cooked through KitchenSync (before using the app, or not marked cooked).
+/// History only: it never touches stock.
+model EatenLog {
+  id          String        @id @default(cuid())
+  householdId String
+  recipeId    String
+  date        DateTime      @db.Date
+  slot        MealSlot
+  loggedById  String
+  createdAt   DateTime      @default(now())
+  household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  recipe      Recipe        @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  loggedBy    User          @relation(fields: [loggedById], references: [id], onDelete: Cascade)
+  absences    MealAbsence[]
+  @@unique([householdId, date, slot])
+}
+
+/// A member who did not eat a planned meal or logged meal. Everyone else in the household counts as having eaten it.
+/// Exactly one of plannedMealId and eatenLogId is set (enforced by a CHECK constraint in the migration).
+model MealAbsence {
+  id            String       @id @default(cuid())
+  userId        String
+  plannedMealId String?
+  eatenLogId    String?
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plannedMeal   PlannedMeal? @relation(fields: [plannedMealId], references: [id], onDelete: Cascade)
+  eatenLog      EatenLog?    @relation(fields: [eatenLogId], references: [id], onDelete: Cascade)
+  @@unique([plannedMealId, userId])
+  @@unique([eatenLogId, userId])
+}
+
+/// "Not today": hides a recipe from the household's suggestions until `until`.
+model RecommendationSnooze {
+  id          String    @id @default(cuid())
+  householdId String
+  recipeId    String
+  snoozedById String
+  until       DateTime
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  recipe      Recipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  snoozedBy   User      @relation(fields: [snoozedById], references: [id], onDelete: Cascade)
+  @@unique([householdId, recipeId])
 }
 
 model MealIngredientAllocation {

@@ -7,6 +7,7 @@ import { formatDay, formatQuantity, slotLabel, slots, statusLabel } from '../../
 import { Badge, Modal, Notice } from '../../components/ui'
 import { RecipePicker } from './RecipePicker'
 import { ServingsStepper } from './AddMealDialog'
+import { WhoIsEating } from '../suggestions/WhoIsEating'
 
 type Props = { meal: PlannedMeal; today: string; recipes: RecipeSummary[]; onClose: () => void; onChanged: () => Promise<void>; onCook: () => void }
 
@@ -63,6 +64,8 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
         <button className="primary-button" disabled={busy || (moveDate === meal.date && moveSlot === meal.slot)} onClick={() => run(() => api.patch(path, { date: moveDate, slot: moveSlot }))}>Move meal</button>
       </div>
     </section>}
+
+    {meal.status !== 'CANCELLED' && <section className="sheet-section"><WhoIsEating kind="meal" id={meal.id} /></section>}
 
     <section className="sheet-section">
       <h3>Ingredients for {meal.servings} servings</h3>

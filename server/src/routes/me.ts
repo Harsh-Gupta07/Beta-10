@@ -29,3 +29,9 @@ meRouter.get('/food-preferences', async (_req, res) => {
 meRouter.put('/food-preferences', async (req, res) => {
   res.json(await preferences.updateMyPreferences(userId(res), preferencesInput.parse(req.body)))
 })
+
+// One dish at a time, for "Love it" and "Don't suggest for me". kind null clears it.
+meRouter.put('/recipe-prefs/:recipeId', async (req, res) => {
+  const { kind } = z.object({ kind: z.enum(['FAVOURITE', 'DISLIKE']).nullable() }).parse(req.body)
+  res.json(await preferences.setRecipePref(userId(res), String(req.params.recipeId), kind))
+})

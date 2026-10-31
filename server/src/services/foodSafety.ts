@@ -16,7 +16,7 @@ const DIET_RANK: Record<DietType, number> = { VEGAN: 0, VEGETARIAN: 1, EGGETARIA
 const CLASS_DIET: Record<DietClass, DietType> = { PLANT: 'VEGAN', DAIRY: 'VEGETARIAN', EGG: 'EGGETARIAN', MEAT: 'NON_VEGETARIAN', SEAFOOD: 'NON_VEGETARIAN' }
 
 export type FoodIngredient = { id: string; name: string; dietClass: DietClass | null; allergens: Allergen[]; allergensReviewed: boolean }
-export type MemberNeeds = { name: string; dietType: DietType | null; allergens: Allergen[]; avoidIngredientIds: string[] }
+export type MemberNeeds = { id?: string; name: string; dietType: DietType | null; allergens: Allergen[]; avoidIngredientIds: string[] }
 export type Conflict = { member: string; kind: 'ALLERGY' | 'RESTRICTION'; reason: string }
 export type SafetyStatus = 'SUITABLE' | 'CONFLICT' | 'UNKNOWN'
 export type RecipeSafety = {

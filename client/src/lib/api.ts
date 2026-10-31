@@ -51,6 +51,26 @@ export type FoodPreferences = {
   dietType: DietType | null; allergens: Allergen[]; maxSpice: number | null; cuisines: string[]
   avoidIngredients: NamedRef[]; likedIngredients: NamedRef[]; favouriteRecipes: NamedRef[]; dislikedRecipes: NamedRef[]
 }
+export type SuggestionReason = { tone: 'good' | 'warn'; text: string }
+export type Suggestion = {
+  score: number
+  reasons: SuggestionReason[]
+  recipe: Pick<RecipeSummary, 'id' | 'name' | 'category' | 'cuisine' | 'description' | 'prepMinutes' | 'cookMinutes' | 'dietType' | 'safety' | 'missingCount' | 'ingredientCount'>
+}
+export type SuggestionsData = {
+  today: string
+  scope: 'household' | 'me'
+  slot: MealSlot | null
+  hasHistory: boolean
+  suggestions: Suggestion[]
+  excludedForSafety: number
+  snoozed: Array<{ recipe: { id: string; name: string }; until: string }>
+}
+type Person = { id: string; name: string }
+export type EatenMeal = { source: 'COOKED' | 'LOGGED'; id: string; recipe: { id: string; name: string }; date: string; slot: MealSlot; eaters: Person[]; absent: Person[] }
+export type HistoryData = { today: string; days: number; meals: EatenMeal[]; dishes: Array<{ recipe: { id: string; name: string }; times: number; lastDate: string; daysAgo: number }> }
+export type Attendance = { editable: boolean; members: Array<Person & { eating: boolean }> }
+
 export type HouseholdFoodProfile = {
   cuisines: string[]; usualSpice: number | null
   members: Array<{ id: string; name: string; dietType: DietType | null; allergens: Allergen[]; avoidIngredients: NamedRef[] }>

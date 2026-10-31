@@ -16,6 +16,7 @@ const PlannerPage = lazy(() => import('./features/planner/PlannerPage').then(m =
 const ShoppingPage = lazy(() => import('./features/shopping/ShoppingPage').then(m => ({ default: m.ShoppingPage })))
 const VerifyPage = lazy(() => import('./features/verification/VerifyPage').then(m => ({ default: m.VerifyPage })))
 const AssistantPage = lazy(() => import('./features/assistant/AssistantPage').then(m => ({ default: m.AssistantPage })))
+const SuggestionsPage = lazy(() => import('./features/suggestions/SuggestionsPage').then(m => ({ default: m.SuggestionsPage })))
 const FoodPreferencesPage = lazy(() => import('./features/preferences/FoodPreferencesPage').then(m => ({ default: m.FoodPreferencesPage })))
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage').then(m => ({ default: m.SettingsPage })))
 
@@ -62,7 +63,8 @@ function App() {
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/shopping" element={<ShoppingPage />} />
         <Route path="/assistant" element={<AssistantPage />} />
-        <Route path="/preferences" element={<FoodPreferencesPage />} />
+        <Route path="/suggestions" element={<SuggestionsPage />} />
+        <Route path="/preferences"element={<FoodPreferencesPage />} />
         <Route path="/settings"element={<SettingsPage onSessionChange={refresh} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

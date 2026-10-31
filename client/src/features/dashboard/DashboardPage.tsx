@@ -6,6 +6,7 @@ import { useSession } from '../../lib/session'
 import { formatDay, formatDelta, formatQuantity, relativeDay, relativeTime, slotLabel, statusLabel, transactionLabel } from '../../lib/format'
 import { ShortageList } from '../planner/ShortageList'
 import { Badge, EmptyState, Notice, PageHeader, Spinner } from '../../components/ui'
+import { WhatToCookNext } from '../suggestions/WhatToCookNext'
 
 export function DashboardPage() {
   const { household } = useSession()
@@ -41,6 +42,8 @@ export function DashboardPage() {
         <Link to="/recipes?new=1"><BookOpen size={16} aria-hidden />Add recipe</Link>
         <Link to="/planner"><CalendarDays size={16} aria-hidden />Plan a meal</Link>
       </section>
+
+      <WhatToCookNext />
 
       <section className="content-grid">
         <article className="panel">

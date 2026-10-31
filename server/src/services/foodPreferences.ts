@@ -74,15 +74,26 @@ export async function updateMyPreferences(userId: string, input: MyPreferencesIn
 export async function householdNeeds(householdId: string): Promise<MemberNeeds[]> {
   const members = await prisma.householdMember.findMany({
     where: { householdId },
-    select: { user: { select: { name: true, foodProfile: { select: { dietType: true, allergens: true } }, ingredientPrefs: { where: { kind: 'AVOID' }, select: { ingredientId: true } } } } },
+    select: { user: { select: { id: true, name: true, foodProfile: { select: { dietType: true, allergens: true } }, ingredientPrefs: { where: { kind: 'AVOID' }, select: { ingredientId: true } } } } },
     orderBy: { joinedAt: 'asc' },
   })
   return members.map(({ user }) => ({
+    id: user.id,
     name: user.name,
     dietType: user.foodProfile?.dietType ?? null,
     allergens: user.foodProfile?.allergens ?? [],
     avoidIngredientIds: user.ingredientPrefs.map(pref => pref.ingredientId),
   }))
+}
+
+/** Sets or clears one dish preference, for the quick "Love it" / "Don't suggest for me" buttons. */
+export async function setRecipePref(userId: string, recipeId: string, kind: 'FAVOURITE' | 'DISLIKE' | null) {
+  const householdId = await householdOf(userId)
+  const visible = await prisma.recipe.count({ where: { id: recipeId, ...(householdId ? visibleTo(householdId) : { householdId: null, isShared: true }) } })
+  if (!visible) throw new AppError(404, 'Recipe not found.')
+  if (kind) await prisma.userRecipePref.upsert({ where: { userId_recipeId: { userId, recipeId } }, update: { kind }, create: { userId, recipeId, kind } })
+  else await prisma.userRecipePref.deleteMany({ where: { userId, recipeId } })
+  return { recipeId, kind }
 }
 
 /** What the household cooks for: owner defaults plus every member's hard rules. Likes and favourites stay with each person. */

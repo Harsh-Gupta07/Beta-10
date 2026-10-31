@@ -10,6 +10,7 @@ import { overview } from '../services/planner.js'
 import { cookingRouter } from './cooking.js'
 import { shoppingRouter } from './shopping.js'
 import { assistantRouter } from './assistant.js'
+import { suggestionsRouter } from './suggestions.js'
 import * as households from '../services/household.js'
 import { listNotifications, markAllRead } from '../services/notifications.js'
 import { getVerificationQueue } from '../services/verification.js'
@@ -30,7 +31,7 @@ householdRouter.post('/join', joinLimit, async (req, res) => {
   res.status(201).json(await households.joinHousehold((res.locals.user as { id: string }).id, code))
 })
 
-householdRouter.use('/:householdId', requireHouseholdMember, pantryRouter, recipeRouter, plannerRouter, cookingRouter, shoppingRouter, assistantRouter)
+householdRouter.use('/:householdId', requireHouseholdMember, pantryRouter, recipeRouter, plannerRouter, cookingRouter, shoppingRouter, assistantRouter, suggestionsRouter)
 
 const role = (res: { locals: Record<string, unknown> }) => res.locals.role as HouseholdRole
 const hid = (res: { locals: Record<string, unknown> }) => res.locals.householdId as string
