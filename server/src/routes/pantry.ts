@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { CANONICAL_UNITS, INPUT_UNITS } from '../services/units.js'
 import * as pantry from '../services/pantry.js'
+import * as staples from '../services/staples.js'
 import { ALLERGENS } from '../services/foodSafety.js'
 
 // Mounted under /households/:householdId, after requireUser + requireHouseholdMember.
@@ -39,6 +40,18 @@ pantryRouter.patch('/ingredients/:ingredientId', async (req, res) => {
 
 pantryRouter.get('/pantry', async (_req, res) => {
   res.json(await pantry.listPantry(ctx(res).householdId))
+})
+
+pantryRouter.get('/pantry/staples', async (_req, res) => {
+  res.json(await staples.getStaples(ctx(res).householdId))
+})
+
+pantryRouter.post('/pantry/staples', async (req, res) => {
+  const { items } = z.object({
+    items: z.array(z.object({ ingredientId: z.string().min(1).max(40), quantity, unit })).min(1, 'Tick at least one staple.').max(100),
+  }).parse(req.body)
+  const { householdId, userId } = ctx(res)
+  res.status(201).json(await staples.addStaples(householdId, userId, items))
 })
 
 pantryRouter.post('/pantry', async (req, res) => {

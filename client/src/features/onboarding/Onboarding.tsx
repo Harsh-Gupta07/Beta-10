@@ -9,11 +9,12 @@ import { KitchenFields, type KitchenSetup } from './KitchenFields'
 import { RolesEditor } from './RolesEditor'
 import { LanguageFields, type LanguageSetup } from './LanguageFields'
 import { DEFAULT_MEASURES } from '../../lib/measures'
+import { StaplesPicker } from '../pantry/StaplesPicker'
 
 type Props = { user: User; household: Household | null; onChanged: () => Promise<void>; onSignOut: () => Promise<void> }
 
-const STEPS = ['Your household', 'Who eats at home', 'Your kitchen', 'Who does what', 'Language & measures']
-const STAGES = ['people', 'kitchen', 'roles', 'language'] as const
+const STEPS = ['Your household', 'Who eats at home', 'Your kitchen', 'Who does what', 'Language & measures', 'Your pantry']
+const STAGES = ['people', 'kitchen', 'roles', 'language', 'pantry'] as const
 
 /** First-time setup as short conversational cards. */
 export function Onboarding({ user, household, onChanged, onSignOut }: Props) {
@@ -33,7 +34,8 @@ export function Onboarding({ user, household, onChanged, onSignOut }: Props) {
       </ol>
     </header>
     {!household ? <HouseholdStep user={user} onCreated={onChanged} />
-      : stage === 'language' ? <LanguageStep user={user} household={household} onBack={() => setStage('roles')} onFinish={finish} />
+      : stage === 'pantry' ? <PantryStep household={household} onBack={() => setStage('language')} onFinish={finish} />
+      : stage === 'language' ? <LanguageStep user={user} household={household} onBack={() => setStage('roles')} onNext={() => setStage('pantry')} />
       : stage === 'roles' ? <RolesStep user={user} household={household} onBack={() => setStage('kitchen')} onNext={() => setStage('language')} />
       : stage === 'kitchen' ? <KitchenStep household={household} onBack={() => setStage('people')} onNext={() => setStage('roles')} />
       : <PeopleStep user={user} household={household} onNext={() => setStage('kitchen')} />}
@@ -127,7 +129,7 @@ function RolesStep({ user, household, onBack, onNext }: { user: User; household:
   </section>
 }
 
-function LanguageStep({ user, household, onBack, onFinish }: { user: User; household: Household; onBack: () => void; onFinish: () => Promise<void> }) {
+function LanguageStep({ user, household, onBack, onNext }: { user: User; household: Household; onBack: () => void; onNext: () => void }) {
   const [setup, setSetup] = useState<LanguageSetup>({
     language: user.language ?? "EN", voiceLanguage: user.voiceLanguage ?? "en-IN",
     katoriMl: household.katoriMl ?? DEFAULT_MEASURES.katoriMl, chammachMl: household.chammachMl ?? DEFAULT_MEASURES.chammachMl, mutthiGrams: household.mutthiGrams ?? DEFAULT_MEASURES.mutthiGrams,
@@ -141,7 +143,7 @@ function LanguageStep({ user, household, onBack, onFinish }: { user: User; house
         await api.patch("/auth/me", { language: setup.language, voiceLanguage: setup.voiceLanguage })
         await api.patch(`/households/${household.id}`, { katoriMl: setup.katoriMl, chammachMl: setup.chammachMl, mutthiGrams: setup.mutthiGrams })
       }
-      await onFinish()
+      onNext()
     } catch (err) { setError(errorMessage(err, "Could not save your language and measures.")); setBusy(false) }
   }
   return <section className="onboarding-card wide">
@@ -153,8 +155,8 @@ function LanguageStep({ user, household, onBack, onFinish }: { user: User; house
     <div className="onboarding-actions">
       <button type="button" className="ghost-button" onClick={onBack} disabled={busy}>Back</button>
       <span className="toolbar-spacer" />
-      <button type="button" className="ghost-button" onClick={() => done(false)} disabled={busy}>Skip for now</button>
-      <button type="button" className="primary-button" onClick={() => done(true)} disabled={busy}>{busy ? "Finishing…" : "Finish setup"}</button>
+      <button type="button" className="ghost-button" onClick={() => done(false)} disabled={busy}>Skip this step</button>
+      <button type="button" className="primary-button" onClick={() => done(true)} disabled={busy}>{busy ? "Saving…" : "Next: your pantry"}</button>
     </div>
   </section>
 }
@@ -258,4 +260,21 @@ export function FamilyEditor({ draft, setDraft, busy, onSave, onCancel }: { draf
       <button type="button" className="primary-button" disabled={busy || !draft.name.trim()} onClick={onSave}>{busy ? 'Saving…' : 'Save'}</button>
     </div>
   </div>
+}
+
+function PantryStep({ household, onBack, onFinish }: { household: Household; onBack: () => void; onFinish: () => Promise<void> }) {
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function finish() {
+    setBusy(true); setError('')
+    try { await onFinish() } catch (err) { setError(errorMessage(err)); setBusy(false) }
+  }
+  return <section className="onboarding-card wide">
+    <p className="eyebrow">STEP 6</p>
+    <h1>What’s already in your kitchen?</h1>
+    <p className="muted">No need to type 50 items. Everyday staples are ticked with typical amounts; untick what you don’t have and fix any amount. You can always add more later.</p>
+    {error && <Notice>{error}</Notice>}
+    <StaplesPicker householdId={household.id} submitLabel={count => busy ? 'Finishing…' : `Add ${count} and finish setup`} onDone={finish}
+      footer={<><button type="button" className="ghost-button" onClick={onBack} disabled={busy}>Back</button><span className="toolbar-spacer" /><button type="button" className="ghost-button" onClick={finish} disabled={busy}>Skip for now</button></>} />
+  </section>
 }
