@@ -3,7 +3,7 @@ import { Plus, X } from 'lucide-react'
 import { api, errorMessage, type Ingredient, type InputUnit, type RecipeDetail, type RecipeDraft } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { baseUnit, unitOptions } from '../../lib/format'
-import { Field, Modal, Notice, Spinner } from '../../components/ui'
+import { Badge, Field, Modal, Notice, Spinner } from '../../components/ui'
 import { useToast } from '../../components/Toast'
 import { SPICE_LABEL } from '../../lib/food'
 
@@ -28,9 +28,10 @@ export function RecipeForm({ recipe, draft, categories, onClose, onSaved }: Prop
   const [prepMinutes, setPrepMinutes] = useState(String(source?.prepMinutes ?? 15))
   const [cookMinutes, setCookMinutes] = useState(String(source?.cookMinutes ?? 20))
   const [steps, setSteps] = useState(source?.instructions.join('\n') ?? '')
-  const [cuisine, setCuisine] = useState(recipe?.cuisine ?? '')
-  const [spiceLevel, setSpiceLevel] = useState(recipe?.spiceLevel ? String(recipe.spiceLevel) : '')
-  const [tags, setTags] = useState(recipe?.tags.join(', ') ?? '')
+  const [cuisine, setCuisine] = useState(recipe?.cuisine ?? draft?.cuisine ?? '')
+  const spice = recipe?.spiceLevel ?? draft?.spiceLevel
+  const [spiceLevel, setSpiceLevel] = useState(spice ? String(spice) : '')
+  const [tags, setTags] = useState((recipe?.tags ?? draft?.tags ?? []).join(', '))
   const [lines, setLines] = useState<Line[]>(() => recipe
     ? recipe.ingredients.map(l => ({ key: nextKey++, ingredientId: l.ingredient.id, quantity: l.quantity, unit: baseUnit[l.unit], note: l.note }))
     : draft?.ingredients.length ? draft.ingredients.map(l => ({ key: nextKey++, ingredientId: l.ingredientId, quantity: l.quantity, unit: l.unit, note: l.note }))
@@ -78,7 +79,10 @@ export function RecipeForm({ recipe, draft, categories, onClose, onSaved }: Prop
   }
 
   const chosen = new Set(lines.map(l => l.ingredientId).filter(Boolean))
-  return <Modal wide title={recipe ? `Edit ${recipe.name}` : draft ? 'Review AI recipe draft' : 'New recipe'} subtitle={draft ? 'Check every quantity and step before saving. Nothing is saved until you press Create.' : 'Quantities are for the number of servings below and scale automatically.'} onClose={onClose}
+  const title = recipe ? `Edit ${recipe.name}` : draft?.kind === 'SWAP' ? 'Review recipe with swaps' : draft ? 'Review AI recipe draft' : 'New recipe'
+  const subtitle = draft?.kind === 'SWAP' ? 'This saves a copy of the recipe with the swaps; the original stays as it is. Check the quantities, then press Create.'
+    : draft ? 'Check every quantity and step before saving. Nothing is saved until you press Create.' : 'Quantities are for the number of servings below and scale automatically.'
+  return <Modal wide title={title} subtitle={<>{draft && draft.kind !== 'SWAP' && <Badge tone="blue">AI Draft</Badge>} {subtitle}</>} onClose={onClose}
     footer={<><button type="button" className="ghost-button" onClick={onClose}>Cancel</button><button form="recipe-form" className="primary-button" disabled={busy || !catalog}>{busy ? 'Saving…' : recipe ? 'Save recipe' : 'Create recipe'}</button></>}>
     {error && <Notice>{error}</Notice>}
     {draft && draft.unresolved.length > 0 && <Notice tone="warning">Not in your ingredient catalog, so not added: {draft.unresolved.join(', ')}. Add them as custom ingredients in the Pantry if you need them.</Notice>}

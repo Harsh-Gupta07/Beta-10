@@ -91,13 +91,14 @@ function summary(recipe: RecipeRow, servings: number, pantry: Map<string, Prisma
 
 /**
  * `stock` replaces on-hand pantry quantities (suggestions pass unreserved stock);
- * `needs` replaces the household's members (suggestions "just for me").
+ * `needs` replaces the household's members (suggestions "just for me");
+ * `servings` checks the pantry for that many people instead of the household's usual number.
  */
-export async function listRecipes(householdId: string, options: { stock?: Map<string, Prisma.Decimal>; needs?: MemberNeeds[] } = {}) {
+export async function listRecipes(householdId: string, options: { stock?: Map<string, Prisma.Decimal>; needs?: MemberNeeds[]; servings?: number } = {}) {
   const [recipes, pantry, servings, needs] = await Promise.all([
     prisma.recipe.findMany({ where: visibleTo(householdId), include: recipeInclude, orderBy: { name: 'asc' } }),
     options.stock ?? pantryByIngredient(householdId),
-    householdServings(householdId),
+    options.servings ?? householdServings(householdId),
     options.needs ?? householdNeeds(householdId),
   ])
   return { servings, recipes: recipes.map(recipe => summary(recipe, servings, pantry, needs)) }

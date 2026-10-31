@@ -11,7 +11,7 @@ import { rankRecipes, type Candidate } from './recommend.js'
 /** "Not today" hides a dish from suggestions for this long. */
 export const SNOOZE_DAYS = 3
 
-export type SuggestionOptions = { slot: MealSlot | null; scope: 'household' | 'me'; limit: number }
+export type SuggestionOptions = { slot: MealSlot | null; scope: 'household' | 'me'; limit: number; servings?: number }
 
 /** Ranked dishes to cook next, for the whole household or just the signed-in member. */
 export async function getSuggestions(householdId: string, userId: string, options: SuggestionOptions) {
@@ -24,7 +24,7 @@ export async function getSuggestions(householdId: string, userId: string, option
   const needs = options.scope === 'me' ? allNeeds.filter(n => n.id === userId) : allNeeds
   const scopeIds = needs.map(n => n.id!)
   const [{ recipes }, prefs, profiles, snoozes] = await Promise.all([
-    listRecipes(householdId, { stock: outlook.free, needs }),
+    listRecipes(householdId, { stock: outlook.free, needs, servings: options.servings }),
     prisma.userRecipePref.findMany({ where: { userId: { in: scopeIds } }, select: { recipeId: true, kind: true, user: { select: { name: true } } } }),
     prisma.userFoodProfile.findMany({ where: { userId: { in: scopeIds } }, select: { maxSpice: true, cuisines: true, user: { select: { name: true } } } }),
     prisma.recommendationSnooze.findMany({ where: { householdId, until: { gt: new Date() } }, select: { until: true, recipe: { select: { id: true, name: true } } } }),

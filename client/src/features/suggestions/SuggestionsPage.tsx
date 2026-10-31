@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { History, Info, Trash2, Undo2, Users, UtensilsCrossed } from 'lucide-react'
-import { api, errorMessage, type FoodPreferences, type HistoryData, type MealSlot, type RecipeSummary, type SuggestionsData } from '../../lib/api'
+import { History, Info, Trash2, Undo2, Users } from 'lucide-react'
+import { api, errorMessage, type HistoryData, type MealSlot, type RecipeSummary, type SuggestionsData } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { addDays, formatDay, relativeDay, slotLabel, slots } from '../../lib/format'
-import { Badge, EmptyState, Field, Notice, PageHeader, Segmented, Spinner } from '../../components/ui'
+import { Badge, Field, Notice, PageHeader, Segmented, Spinner } from '../../components/ui'
 import { useToast } from '../../components/Toast'
-import { SuggestionCard, type MyDishPrefs } from './SuggestionCard'
+import { MealOptions } from './MealOptions'
 import { WhoIsEating } from './WhoIsEating'
 
 type SlotChoice = MealSlot | 'ANY'
@@ -16,29 +16,28 @@ export function SuggestionsPage() {
   const [slot, setSlot] = useState<SlotChoice>('ANY')
   const [data, setData] = useState<SuggestionsData | null>(null)
   const [history, setHistory] = useState<HistoryData | null>(null)
-  const [prefs, setPrefs] = useState<MyDishPrefs | undefined>()
+  // Bumped after changes made outside the options list (e.g. "Show again"), so the options refresh too.
+  const [version, setVersion] = useState(0)
   const [error, setError] = useState('')
   const toast = useToast()
 
   const load = useCallback(async () => {
     setError('')
     try {
-      const [s, h, p] = await Promise.all([
-        api.get<SuggestionsData>(`/households/${household.id}/suggestions`, { params: { scope, limit: 12, ...(slot === 'ANY' ? {} : { slot }) } }),
+      const [s, h] = await Promise.all([
+        api.get<SuggestionsData>(`/households/${household.id}/suggestions`, { params: { scope, limit: 1, ...(slot === 'ANY' ? {} : { slot }) } }),
         api.get<HistoryData>(`/households/${household.id}/history`, { params: { days: 30, scope } }),
-        api.get<FoodPreferences>('/me/food-preferences'),
       ])
       setData(s.data); setHistory(h.data)
-      setPrefs({ favourite: new Set(p.data.favouriteRecipes.map(r => r.id)), disliked: new Set(p.data.dislikedRecipes.map(r => r.id)) })
     } catch (err) { setError(errorMessage(err, 'Suggestions could not be loaded.')) }
   }, [household.id, scope, slot])
   useEffect(() => { void load() }, [load])
 
   // Refresh first, so the confirmation never appears next to a stale list.
-  const changed = async (message: string) => { await load(); toast.success(message) }
+  const changed = async (message: string) => { await load(); setVersion(v => v + 1); toast.success(message) }
 
   return <>
-    <PageHeader eyebrow="WHAT TO COOK" title="Ideas for your next meal" description="Ranked from your pantry, what you’ve eaten lately and what people like. Dishes that clash with anyone’s allergies or diet are never suggested." />
+    <PageHeader eyebrow="WHAT TO COOK" title="Meal options" description="Dishes from your recipes, sorted by what your pantry covers: fully available, ready with a swap, or needing a few things bought. Ranked by what you’ve eaten lately and what people like. Dishes that clash with anyone’s allergies or diet are never shown." />
     {error && <Notice onRetry={load}>{error}</Notice>}
 
     <section className="toolbar">
@@ -50,15 +49,7 @@ export function SuggestionsPage() {
     {data && <div className="suggestions-layout">
       <section className="stack">
         {!data.hasHistory && <Notice tone="warning"><Info size={14} aria-hidden className="inline-icon" /> No eating history yet. Mark meals as cooked, or log what you ate below, and suggestions will start avoiding repeats.</Notice>}
-        {data.suggestions.length === 0
-          ? <section className="panel"><EmptyState icon={UtensilsCrossed} title="No suggestions right now">
-              {data.excludedForSafety ? 'Every dish clashes with someone’s allergies or diet, or is hidden for now. Add recipes that suit everyone, or check Food Preferences.' : 'Add some recipes to get ideas.'}
-            </EmptyState></section>
-          : data.suggestions.map(s => <SuggestionCard key={s.recipe.id} suggestion={s} prefs={prefs} today={data.today} defaultSlot={data.slot} onChanged={changed} />)}
-        <p className="muted small">
-          {data.excludedForSafety > 0 && `${data.excludedForSafety} dish${data.excludedForSafety === 1 ? ' was' : 'es were'} left out because ${data.excludedForSafety === 1 ? 'it clashes' : 'they clash'} with someone’s allergies or diet. `}
-          “Ready” uses only stock that isn’t already reserved for planned meals.
-        </p>
+        <MealOptions scope={scope} slot={slot === 'ANY' ? null : slot} version={version} onChanged={load} />
         {data.snoozed.length > 0 && <section className="panel">
           <p className="eyebrow">HIDDEN FOR NOW</p>
           <ul className="plain-list">{data.snoozed.map(s => <li key={s.recipe.id}>

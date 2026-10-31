@@ -4,7 +4,7 @@ KitchenSync is a household kitchen assistant for planning meals, tracking what i
 
 You plan meals for the week. KitchenSync reserves the ingredients those meals need from your pantry, warns you early about anything you'll run short of, builds your shopping list, and updates your stock when you actually cook or receive groceries.
 
-Status: Phase 1, Phase 2 (food preferences, What to Cook) and onboarding are built, and 113 automated tests pass.
+Status: Phase 1, Phase 2 (food preferences, What to Cook) and onboarding are built, and 122 automated tests pass.
 
 ## Contents
 
@@ -247,7 +247,29 @@ Suggestions come from your own data, never from guesses:
 - **What people like**: favourites, dislikes, cuisines and spice limits from Food Preferences.
 - Dishes that clash with anyone's allergy or diet, and drinks, are never suggested.
 
-Switch between **Everyone** and **Just me**, or pick a meal. On each idea: **Plan it** adds it to the planner, **Not today** hides it for everyone for 3 days, **Love it** and **Don't suggest for me** update your own preferences. The AI Assistant uses the same ranking when you ask "What should we cook?".
+#### Meal options
+
+The What to Cook page shows **meal options** from your built-in and household recipes, each clearly labelled:
+
+| Label | Meaning |
+|---|---|
+| **Fully available** | Every ingredient is in the pantry and not reserved for another planned meal. |
+| **Needs substitution** | Something is short, but a swap you have in stock covers it, e.g. *Swap 200 g Paneer for 200 g Tofu*. Swaps come from a hand-picked list of common Indian swaps, always in the same unit, and a swap is never offered if it clashes with anyone's allergy, diet or never-use list. |
+| **Needs purchase** | Something has to be bought. Only the amount you are short of is listed. |
+
+Each option shows prep and cooking time, servings, **pantry coverage** (e.g. *7 of 9 ingredients*), ingredients that **expire soon** (dishes that use them up rank higher), and the allergy and diet check. Choose the number of servings, filter by label, and press **Regenerate options** to see the next set.
+
+Actions, each confirmed before anything changes:
+
+- **Plan this meal**: pick the day and meal; the ingredients are reserved.
+- **Cook now** (fully available dishes): plans it for the current meal today and opens cooking mode. Stock only leaves the pantry when you mark it as cooked. If that meal already has a dish, you're asked to pick another.
+- **Review recipe with swaps**: opens a copy of the recipe with the swaps applied; save it as your own recipe (the original is unchanged).
+- **Add missing to shopping list**: shows exactly what will be added first.
+- **Like**, **Dislike** (just for you) and **Not suitable** (hidden for everyone for 3 days).
+
+**AI ideas (optional).** When a Gemini key is set on the server, **Get AI ideas** suggests new dishes from your free stock. They are labelled **AI Draft** and must be reviewed before saving. Gemini only receives ingredient names and amounts and anonymous diet and allergy limits, never people's names or health details. KitchenSync then matches every ingredient to your catalog, works out stock and safety itself, and drops any idea that would clash with someone. Without a key, or if Gemini is down, everything else on the page works as normal.
+
+Switch between **Everyone** and **Just me**, or pick a meal. The Dashboard's top ideas and the AI Assistant ("What should we cook?") use the same ranking.
 
 ---
 
@@ -326,7 +348,7 @@ The free tier allows only a few requests per minute, and one question can take 2
 
 ### Tests
 
-`npm test` runs 113 tests against a real PostgreSQL database: unit conversion and scaling, the allocation engine (including the brief's rice example), food safety and preferences, eating history and suggestions, release hardening (origin checks and rate limits, including sign-in spraying and demo assistant use), sign-in and demo kitchens, pantry, recipes, planner, cooking (double and simultaneous completion), shopping (partial delivery, double receipt), verification and notifications, invites and permissions, the assistant's offline mode, and the brief's full integration journey (`server/src/routes/journey.test.ts`).
+`npm test` runs 122 tests against a real PostgreSQL database: unit conversion and scaling, the allocation engine (including the brief's rice example), food safety and preferences, eating history and suggestions, release hardening (origin checks and rate limits, including sign-in spraying and demo assistant use), sign-in and demo kitchens, pantry, recipes, planner, cooking (double and simultaneous completion), shopping (partial delivery, double receipt), verification and notifications, invites and permissions, the assistant's offline mode, and the brief's full integration journey (`server/src/routes/journey.test.ts`).
 
 1. Create a test database: `CREATE DATABASE kitchensync_test OWNER kitchensync;`
 2. Set `TEST_DATABASE_URL` in `server/.env`. Its name must contain `test`.

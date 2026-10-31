@@ -23,7 +23,7 @@ export function EmptyState({ icon: Icon, title, children, action }: { icon: Luci
   return <div className="empty-state"><span className="empty-icon"><Icon size={22} aria-hidden /></span><strong>{title}</strong>{children && <p>{children}</p>}{action}</div>
 }
 
-export function Badge({ tone, children }: { tone: 'green' | 'amber' | 'red' | 'grey' | 'blue'; children: ReactNode }) {
+export function Badge({ tone, children }: { tone: 'green' | 'amber' | 'red' | 'grey' | 'blue' | 'teal'; children: ReactNode }) {
   return <span className={`badge ${tone}`}>{children}</span>
 }
 

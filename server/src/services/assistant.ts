@@ -9,6 +9,7 @@ import type { AppLanguage, MealSlot } from '@prisma/client'
 import { getWeek } from './planner.js'
 import { localToday } from './dates.js'
 import { describeQuantity, INPUT_UNITS, isCanonicalUnit, toCanonical, unitsFor, type InputUnit } from './units.js'
+import { AppError } from '../lib/errors.js'
 
 // The assistant interprets language and explains. Every quantity, scaling, allocation and stock change
 // comes from the deterministic services below; anything that would change data is returned as an
@@ -177,25 +178,34 @@ async function runTool(name: string, args: Record<string, any>, ctx: Context): P
       return { status: items.length ? 'awaiting_user_confirmation' : 'nothing_proposed', proposed: items.map(i => `${i.quantity} ${i.unit} ${i.ingredientName}`), problems }
     }
     case 'draft_recipe': {
-      const ingredients: RecipeDraft['ingredients'] = []
-      const unresolved: string[] = []
-      for (const raw of Array.isArray(args.ingredients) ? args.ingredients : []) {
-        const { match } = resolveIngredient(String(raw?.name ?? ''), ctx.ingredients)
-        const q = match ? resolveQuantity(match, raw.quantity, raw.unit) : null
-        if (!match || !q || 'error' in q || ingredients.some(i => i.ingredientId === match.id)) { unresolved.push(`${raw?.quantity ?? ''} ${raw?.unit ?? ''} ${raw?.name ?? ''}`.trim()); continue }
-        ingredients.push({ ingredientId: match.id, ingredientName: match.name, quantity: String(raw.quantity), unit: q.unit, note: String(raw.note ?? '').slice(0, 80) })
-      }
-      const servings = Math.min(50, Math.max(1, Math.round(Number(args.servings) || 4)))
-      const draft: RecipeDraft = {
-        name: String(args.name ?? 'New recipe').slice(0, 80), category: String(args.category ?? 'Other').slice(0, 40), description: String(args.description ?? '').slice(0, 500),
-        baseServings: servings, prepMinutes: Math.max(0, Math.round(Number(args.prep_minutes) || 0)), cookMinutes: Math.max(0, Math.round(Number(args.cook_minutes) || 0)),
-        instructions: (Array.isArray(args.steps) ? args.steps : []).map((s: unknown) => String(s).slice(0, 1000)).slice(0, 40), ingredients, unresolved,
-      }
+      const draft = buildDraft(args, ctx.ingredients)
+      const { ingredients, unresolved } = draft
       ctx.actions.push({ id: randomUUID(), type: 'RECIPE_DRAFT', draft, summary: `Review recipe draft: ${draft.name}` })
       return { status: 'draft_ready_for_review', ingredients_matched: ingredients.length, not_in_catalog: unresolved, note: 'The user must review and save it; it is not saved yet.' }
     }
     default:
       return { error: `Unknown tool ${name}` }
+  }
+}
+
+/**
+ * Turns a model's recipe (names, quantities and units as text) into a draft with catalog ingredients and exact units.
+ * Anything that can't be matched or measured goes to `unresolved` instead of being guessed.
+ */
+export function buildDraft(args: Record<string, any>, catalog: Ingredient[]): RecipeDraft {
+  const ingredients: RecipeDraft['ingredients'] = []
+  const unresolved: string[] = []
+  for (const raw of Array.isArray(args.ingredients) ? args.ingredients : []) {
+    const { match } = resolveIngredient(String(raw?.name ?? ''), catalog)
+    const q = match ? resolveQuantity(match, raw.quantity, raw.unit) : null
+    if (!match || !q || 'error' in q || ingredients.some(i => i.ingredientId === match.id)) { unresolved.push(`${raw?.quantity ?? ''} ${raw?.unit ?? ''} ${raw?.name ?? ''}`.trim()); continue }
+    ingredients.push({ ingredientId: match.id, ingredientName: match.name, quantity: String(raw.quantity), unit: q.unit, note: String(raw.note ?? '').slice(0, 80) })
+  }
+  const servings = Math.min(50, Math.max(1, Math.round(Number(args.servings) || 4)))
+  return {
+    name: String(args.name ?? 'New recipe').slice(0, 80), category: String(args.category ?? 'Other').slice(0, 40), description: String(args.description ?? '').slice(0, 500),
+    baseServings: servings, prepMinutes: Math.max(0, Math.round(Number(args.prep_minutes) || 0)), cookMinutes: Math.max(0, Math.round(Number(args.cook_minutes) || 0)),
+    instructions: (Array.isArray(args.steps) ? args.steps : []).map((s: unknown) => String(s).slice(0, 1000)).slice(0, 40), ingredients, unresolved,
   }
 }
 
@@ -273,6 +283,39 @@ async function fallbackReply(householdId: string, message: string, reason: strin
 }
 
 // ---- Entry point ----
+
+/**
+ * One structured answer from Gemini, shaped by `schema`, with the same one-time fallback model as the chat.
+ * Throws AI_NOT_CONFIGURED without a key and AI_UNAVAILABLE when Gemini can't answer, so callers can fall back.
+ */
+export async function generateJson(prompt: string, system: string, schema: object): Promise<unknown> {
+  if (!env.AI_API_KEY) throw new AppError(409, 'AI ideas need a Gemini API key on the server. Your recipe options work without it.', 'AI_NOT_CONFIGURED')
+  const once = async (model: string) => {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': env.AI_API_KEY! },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, responseMimeType: 'application/json', responseSchema: schema } }),
+      signal: AbortSignal.timeout(30000),
+    }).catch(error => { throw new AiUnavailable(error instanceof Error && error.name === 'TimeoutError' ? 'the AI service took too long to answer' : 'the AI service could not be reached', true) })
+    const body = await response.json().catch(() => ({})) as { candidates?: Array<{ content?: Content }>; error?: { message?: string; status?: string } }
+    if (!response.ok) {
+      console.error('Gemini error', model, response.status, body.error?.status, body.error?.message)
+      throw new AiUnavailable(response.status === 429 ? 'the AI usage limit was reached' : response.status === 400 || response.status === 403 || response.status === 404 ? 'the AI key or model is not accepted' : `the AI service returned an error (${response.status})`, response.status === 429 || response.status >= 500)
+    }
+    const text = body.candidates?.[0]?.content?.parts?.filter(p => p.text && !p.thought).map(p => p.text).join('') ?? ''
+    try { return JSON.parse(text) as unknown } catch { throw new AiUnavailable('the AI answer was not in the expected format') }
+  }
+  try {
+    try { return await once(env.AI_MODEL) }
+    catch (error) {
+      if (error instanceof AiUnavailable && error.transient && env.AI_FALLBACK_MODEL !== env.AI_MODEL) return await once(env.AI_FALLBACK_MODEL)
+      throw error
+    }
+  } catch (error) {
+    if (error instanceof AiUnavailable) throw new AppError(503, `AI ideas aren’t available right now: ${error.message}. Your recipe options still work.`, 'AI_UNAVAILABLE')
+    throw error
+  }
+}
 
 export function assistantStatus() {
   return { configured: Boolean(env.AI_API_KEY), model: env.AI_API_KEY ? env.AI_MODEL : null, fallbackModel: env.AI_API_KEY ? env.AI_FALLBACK_MODEL : null }

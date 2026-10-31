@@ -84,6 +84,7 @@ h1, h2, h3 { font-family: Newsreader, Georgia, serif; color: var(--ink); }
 .badge.red { background: var(--red-bg); color: var(--red); }
 .badge.grey { background: #eff1ec; color: #5f6a63; }
 .badge.blue { background: var(--blue-bg); color: var(--blue); }
+.badge.teal { background: #e0eff0; color: #1d6a6e; }
 .badge-row { display: flex; flex-wrap: wrap; gap: 5px; }
 
 .segmented { display: inline-flex; gap: 4px; padding: 3px; background: #eef1eb; border-radius: 10px; max-width: 100%; }
@@ -844,3 +845,29 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
 @media (max-width: 760px) { .toast-region { bottom: calc(76px + env(safe-area-inset-bottom)); } }
 @media (pointer: coarse) { .toast-close { width: 40px; height: 40px; margin: -9px -8px -9px 0; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* Meal options */
+.options-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.options-toolbar .segmented { flex-wrap: wrap; }
+.options-servings { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
+.option-list { display: grid; gap: 12px; }
+.option-card { border-left-width: 4px; }
+.option-card.fully_available { border-left-color: var(--green); }
+.option-card.needs_substitution { border-left-color: #2b8a8f; }
+.option-card.needs_purchase { border-left-color: var(--amber); }
+.option-card.ai { border-left-color: var(--blue); border-style: dashed; border-left-style: solid; }
+.coverage { display: grid; gap: 4px; }
+.coverage small { font-size: 12px; color: var(--ink-soft); }
+.coverage-bar { display: block; height: 6px; border-radius: 999px; background: #ece6da; overflow: hidden; }
+.coverage-bar span { display: block; height: 100%; border-radius: inherit; background: var(--green); }
+.chip-line { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.expiry-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 12px; background: var(--amber-bg); color: #8a4d0f; }
+.expiry-chip.expired { background: var(--red-bg); color: #8f322b; }
+.stock-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.stock-lines li { display: flex; gap: 8px; align-items: flex-start; }
+.stock-lines li > svg { flex: none; margin-top: 3px; color: var(--muted); }
+.stock-lines small { display: block; color: var(--muted); font-size: 12px; }
+.feedback-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.feedback-row .link-button { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-soft); font-weight: 500; }
+.feedback-row .link-button:hover { color: var(--green-dark); }
+.ai-ideas .panel-heading h2 { display: flex; align-items: center; gap: 6px; }

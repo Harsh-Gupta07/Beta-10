@@ -234,11 +234,41 @@ export type HouseholdDetails = Household & {
   members: Array<User & { role: 'OWNER' | 'MEMBER'; joinedAt: string }>
 }
 
+/** A recipe that isn't saved yet. `kind` says where it came from: an AI suggestion or a copy with swaps applied. */
 export type RecipeDraft = {
   name: string; category: string; description: string; baseServings: number; prepMinutes: number; cookMinutes: number; instructions: string[]
   ingredients: Array<{ ingredientId: string; ingredientName: string; quantity: string; unit: InputUnit; note: string }>
   unresolved: string[]
+  kind?: 'AI' | 'SWAP'
+  cuisine?: string; spiceLevel?: number | null; tags?: string[]
 }
+
+export type OptionStatus = 'FULLY_AVAILABLE' | 'NEEDS_SUBSTITUTION' | 'NEEDS_PURCHASE'
+type Amount = { quantity: string; unit: CanonicalUnit }
+type IngredientRef = { id: string; name: string }
+export type MealOptionStock = {
+  status: OptionStatus
+  coverage: { inPantry: number; total: number; percent: number }
+  substitutions: Array<{ original: IngredientRef & Amount; substitute: IngredientRef & Amount; note: string }>
+  toBuy: Array<{ ingredient: IngredientRef; swapAvailable: string | null } & Amount>
+  safety: RecipeSafety & { dietType: DietType | null }
+}
+export type MealOption = MealOptionStock & {
+  score: number
+  servings: number
+  recipe: { id: string; name: string; category: string; cuisine: string; description: string; prepMinutes: number; cookMinutes: number; custom: boolean }
+  expiring: Array<{ ingredient: IngredientRef; daysLeft: number; expired: boolean }>
+  reasons: SuggestionReason[]
+}
+export type MealOptionsData = {
+  today: string; servings: number; scope: 'household' | 'me'; slot: MealSlot | null
+  counts: Record<OptionStatus, number>; total: number; wrapped: boolean
+  options: MealOption[]
+  excludedForSafety: number
+  cookNow: { date: string; slot: MealSlot; planned: Array<{ mealId: string; slot: MealSlot; status: MealStatus; recipe: { id: string; name: string } }> }
+  aiAvailable: boolean
+}
+export type MealIdea = MealOptionStock & { kind: 'AI'; draft: RecipeDraft }
 export type AssistantAction =
   | { id: string; type: 'ADD_STOCK'; ingredientId: string; ingredientName: string; quantity: string; unit: InputUnit; summary: string }
   | { id: string; type: 'ADD_TO_SHOPPING'; items: Array<{ ingredientId: string; ingredientName: string; quantity: string; unit: InputUnit }>; summary: string }

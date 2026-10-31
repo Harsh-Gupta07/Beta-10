@@ -9,7 +9,7 @@ const ingredients: Array<[name: string, category: string, canonicalUnit: 'g' | '
   ['Semolina (rava)', 'Grains & Flours', 'g'], ['Flattened rice (poha)', 'Grains & Flours', 'g'], ['Gram flour (besan)', 'Grains & Flours', 'g'],
   ['Toor dal', 'Pulses', 'g'], ['Moong dal', 'Pulses', 'g'], ['Masoor dal', 'Pulses', 'g'], ['Chana dal', 'Pulses', 'g'],
   ['Rajma', 'Pulses', 'g'], ['Kabuli chana', 'Pulses', 'g'],
-  ['Milk', 'Dairy', 'ml'], ['Curd', 'Dairy', 'g'], ['Paneer', 'Dairy', 'g'], ['Ghee', 'Dairy', 'ml'], ['Butter', 'Dairy', 'g'], ['Eggs', 'Dairy', 'count'],
+  ['Milk', 'Dairy', 'ml'], ['Curd', 'Dairy', 'g'], ['Paneer', 'Dairy', 'g'], ['Tofu', 'Dairy', 'g'], ['Ghee', 'Dairy', 'ml'], ['Butter', 'Dairy', 'g'], ['Eggs', 'Dairy', 'count'],
   ['Onion', 'Vegetables', 'g'], ['Tomato', 'Vegetables', 'g'], ['Potato', 'Vegetables', 'g'], ['Carrot', 'Vegetables', 'g'],
   ['Green peas', 'Vegetables', 'g'], ['Cauliflower', 'Vegetables', 'g'], ['Capsicum', 'Vegetables', 'g'], ['Spinach', 'Vegetables', 'g'],
   ['French beans', 'Vegetables', 'g'], ['Green chilli', 'Vegetables', 'g'], ['Ginger', 'Vegetables', 'g'], ['Garlic', 'Vegetables', 'g'],
@@ -25,6 +25,8 @@ const foodTags: Record<string, { dietClass: DietClass; allergens: Allergen[]; re
   'Milk': { dietClass: 'DAIRY', allergens: ['MILK'] }, 'Curd': { dietClass: 'DAIRY', allergens: ['MILK'] },
   'Paneer': { dietClass: 'DAIRY', allergens: ['MILK'] }, 'Ghee': { dietClass: 'DAIRY', allergens: ['MILK'] },
   'Butter': { dietClass: 'DAIRY', allergens: ['MILK'] }, 'Eggs': { dietClass: 'EGG', allergens: ['EGG'] },
+  // A plant-based swap for paneer.
+  'Tofu': { dietClass: 'PLANT', allergens: ['SOY'] },
   'Wheat flour (atta)': { dietClass: 'PLANT', allergens: ['GLUTEN'] }, 'Semolina (rava)': { dietClass: 'PLANT', allergens: ['GLUTEN'] },
   'Peanuts': { dietClass: 'PLANT', allergens: ['PEANUT'] }, 'Mustard seeds': { dietClass: 'PLANT', allergens: ['MUSTARD'] },
   // Most packaged hing is cut with wheat flour.

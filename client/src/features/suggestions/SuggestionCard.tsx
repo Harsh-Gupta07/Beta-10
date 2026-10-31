@@ -61,11 +61,12 @@ export function SuggestionCard({ suggestion, prefs, compact, onChanged, defaultS
   </article>
 }
 
-function PlanDialog({ recipe, today, defaultSlot, onClose, onPlanned }: { recipe: Suggestion['recipe']; today: string; defaultSlot: MealSlot; onClose: () => void; onPlanned: (date: string, slot: MealSlot) => void }) {
+/** Confirms the day, meal and servings before planning; planning reserves stock but never uses it. */
+export function PlanDialog({ recipe, today, defaultSlot, defaultServings, onClose, onPlanned }: { recipe: Pick<Suggestion['recipe'], 'id' | 'name'>; today: string; defaultSlot: MealSlot; defaultServings?: number; onClose: () => void; onPlanned: (date: string, slot: MealSlot) => void }) {
   const { household } = useSession()
   const [date, setDate] = useState(today)
   const [slot, setSlot] = useState<MealSlot>(defaultSlot)
-  const [servings, setServings] = useState(household.defaultServings)
+  const [servings, setServings] = useState(defaultServings ?? household.defaultServings)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   async function save() {
