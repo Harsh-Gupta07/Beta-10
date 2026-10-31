@@ -12,6 +12,10 @@ import { prisma } from './lib/prisma.js'
 import { authRouter } from './routes/auth.js'
 import { householdRouter } from './routes/households.js'
 import { meRouter } from './routes/me.js'
+import { nutritionRouter } from './routes/nutrition.js'
+import { mealLogsRouter } from './routes/mealLogs.js'
+import { nutritionRecommendationsRouter } from './routes/nutritionRecommendations.js'
+import { scansRouter } from './routes/scans.js'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
@@ -91,6 +95,10 @@ export function createApp() {
   app.use('/api/v1/auth', authRouter)
   app.use('/api/v1/households', householdRouter)
   app.use('/api/v1/me', meRouter)
+  app.use('/api/v1/nutrition', nutritionRouter)
+  app.use('/api/v1/meal-logs', mealLogsRouter)
+  app.use('/api/v1/recommendations/nutrition', nutritionRecommendationsRouter)
+  app.use('/api/v1/scans', scansRouter)
 
   if (env.SERVE_CLIENT) {
     const dist = path.resolve(process.cwd(), env.CLIENT_DIST_DIR)

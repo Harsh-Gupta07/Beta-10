@@ -34,10 +34,13 @@ const schema = z.object({
   RATE_LIMIT_ASSISTANT: limit(10),    // per user, 1 minute
   RATE_LIMIT_ASSISTANT_DEMO: limit(20), // all demo kitchens on one IP together, 1 hour
   AI_API_KEY: z.string().trim().optional(),
+  AI_API_BASE_URL: z.string().url().default('https://generativelanguage.googleapis.com/v1beta'),
   /** Gemini model used by the assistant. */
   AI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
   /** Tried once when the main model is overloaded, rate-limited or slow. */
   AI_FALLBACK_MODEL: z.string().trim().min(1).default('gemini-flash-lite-latest'),
+  /** Multimodal model used only for food-photo proposals. */
+  AI_VISION_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
   /**
    * OAuth Web client ID from Google Cloud Console. It is public (every sign-in page shows it), so the team's ID is the
    * default and a fresh clone works without editing .env. Set another ID to use your own project, or "off" to hide the button.

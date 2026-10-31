@@ -37,6 +37,16 @@ const foodTags: Record<string, { dietClass: DietClass; allergens: Allergen[]; re
   'Garam masala': { dietClass: 'PLANT', allergens: [], reviewed: false }, 'Chole masala': { dietClass: 'PLANT', allergens: [], reviewed: false },
 }
 
+// Demonstration subset derived from common IFCT/pack nutrition values, per 100 canonical units.
+// Production should replace/verify each row against the licensed source edition recorded below.
+const nutrition: Record<string, [calories: number, protein: number, carbs: number, fat: number, fibre: number]> = {
+  Rice: [356, 6.8, 78.2, 0.5, 2.8], 'Basmati rice': [356, 7.1, 78, 0.6, 2.4], 'Wheat flour (atta)': [340, 12, 72, 2, 11],
+  'Toor dal': [335, 22.3, 57.6, 1.7, 15], 'Moong dal': [347, 24, 59.9, 1.2, 16], 'Masoor dal': [352, 24.6, 63.4, 1.1, 10.7], Rajma: [333, 23.6, 60, 0.8, 24.9],
+  Milk: [61, 3.2, 4.8, 3.3, 0], Curd: [61, 3.5, 4.7, 3.3, 0], Paneer: [265, 18.3, 1.2, 20.8, 0], Ghee: [900, 0, 0, 100, 0], Oil: [884, 0, 0, 100, 0],
+  Onion: [40, 1.1, 9.3, 0.1, 1.7], Tomato: [18, 0.9, 3.9, 0.2, 1.2], Potato: [77, 2, 17.5, 0.1, 2.2], Carrot: [41, 0.9, 9.6, 0.2, 2.8],
+  Spinach: [23, 2.9, 3.6, 0.4, 2.2], Cauliflower: [25, 1.9, 5, 0.3, 2], 'Green peas': [81, 5.4, 14.5, 0.4, 5.7], Peanuts: [567, 25.8, 16.1, 49.2, 8.5],
+}
+
 async function main() {
   for (const [name, category, canonicalUnit] of ingredients) {
     const nameKey = name.toLowerCase()
@@ -54,6 +64,12 @@ async function main() {
 
   // Shared recipes are matched by name and refreshed in place so planned meals keep their recipe ids.
   const catalog = new Map((await prisma.ingredient.findMany({ where: { householdId: null } })).map(i => [i.nameKey, i]))
+  for (const [name, values] of Object.entries(nutrition)) {
+    const ingredient = catalog.get(name.toLowerCase())
+    if (!ingredient) continue
+    const [caloriesPer100, proteinG, carbsG, fatG, fibreG] = values
+    await prisma.ingredientNutrition.upsert({ where: { ingredientId: ingredient.id }, update: { caloriesPer100, proteinG, carbsG, fatG, fibreG, source: 'IFCT/common label demo subset', sourceReference: 'DEMO-IFCT-2017' }, create: { ingredientId: ingredient.id, caloriesPer100, proteinG, carbsG, fatG, fibreG, source: 'IFCT/common label demo subset', sourceReference: 'DEMO-IFCT-2017' } })
+  }
   for (const recipe of recipes) {
     const lines = recipe.ingredients.map(([name, quantity, note], position) => {
       const ingredient = catalog.get(name.toLowerCase())

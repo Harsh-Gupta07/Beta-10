@@ -1,5 +1,11 @@
 # KitchenSync (Beta-10)
 
+## KitchenSync Fit (development preview)
+
+The `/fit` module adds a private nutrition profile, deterministic Mifflin-St Jeor calorie and macro targets, daily meal progress, pantry-aware Premium recommendations, and confirmation-gated mock food scans. In development, use **Enable Premium demo** to demonstrate Premium without payments. Photo proposals are estimates and never change stock until confirmation.
+
+Nutrition calculations use Prisma `Decimal`; missing ingredient nutrition is reported as incomplete rather than counted as zero. Seed nutrition rows are a demonstration subset and must be verified against a licensed production nutrition dataset before public health use.
+
 KitchenSync is a household kitchen assistant for planning meals, tracking what is in your kitchen, and knowing what to buy. It keeps everything connected: **Plan → Allocate → Detect shortage → Shop → Cook → Deduct → Verify**.
 
 You plan meals for the week. KitchenSync reserves the ingredients those meals need from your pantry, warns you early about anything you'll run short of, builds your shopping list, and updates your stock when you actually cook or receive groceries.
