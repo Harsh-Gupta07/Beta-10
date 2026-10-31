@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { BookOpen, Clock, Plus, Search, SearchX, Users } from 'lucide-react'
+import { ArrowRight, BookOpen, Clock, Plus, Search, SearchX, Users } from 'lucide-react'
 import { api, errorMessage, type RecipeSummary } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { Badge, EmptyState, Notice, PageHeader, Segmented, Spinner } from '../../components/ui'
 import { RecipeForm } from './RecipeForm'
+import { RecipePhoto } from './RecipePhoto'
 
 export function RecipesPage() {
   const { household } = useSession()
@@ -54,15 +55,20 @@ export function RecipesPage() {
             {readyOnly ? 'Nothing can be cooked entirely from your pantry right now. Add stock or turn off “Ready to cook”.' : 'Try a different search or category.'}
           </EmptyState></section>
         : <section className="recipe-grid">{visible.map(recipe => <Link key={recipe.id} to={`/recipes/${recipe.id}`} className="recipe-card">
-            <div className="recipe-card-top"><span className="eyebrow">{recipe.category}</span>{recipe.custom && <Badge tone="blue">Yours</Badge>}</div>
-            <h2>{recipe.name}</h2>
-            <p>{recipe.description || 'No description.'}</p>
-            <div className="recipe-meta">
-              <span><Clock size={14} aria-hidden />{recipe.prepMinutes + recipe.cookMinutes} min</span>
-              <span><Users size={14} aria-hidden />Serves {recipe.baseServings}</span>
-              <span>{recipe.ingredientCount} ingredients</span>
+            <div className="recipe-card-image"><RecipePhoto name={recipe.name} />
+              <span className="recipe-category">{recipe.category}</span>
+              <span className="recipe-readiness">{recipe.missingCount === 0 ? <Badge tone="green">Ready to cook</Badge> : <Badge tone="amber">{recipe.missingCount} missing</Badge>}</span>
             </div>
-            {recipe.missingCount === 0 ? <Badge tone="green">Ready to cook</Badge> : <Badge tone="amber">Missing {recipe.missingCount} of {recipe.ingredientCount}</Badge>}
+            <div className="recipe-card-body">
+              <div className="recipe-card-top"><h2>{recipe.name}</h2>{recipe.custom && <Badge tone="blue">Your recipe</Badge>}</div>
+              <p>{recipe.description || 'A dependable home-style recipe.'}</p>
+              <div className="recipe-meta">
+                <span><Clock size={14} aria-hidden />{recipe.prepMinutes + recipe.cookMinutes} min</span>
+                <span><Users size={14} aria-hidden />{recipe.baseServings} servings</span>
+                <span>{recipe.ingredientCount} ingredients</span>
+              </div>
+              <span className="recipe-open">View recipe <ArrowRight size={15} aria-hidden /></span>
+            </div>
           </Link>)}</section>}
     </>}
 

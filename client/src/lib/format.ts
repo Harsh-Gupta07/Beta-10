@@ -27,7 +27,7 @@ export const transactionLabel: Record<StockTransaction['type'], string> = {
 }
 
 export function formatDate(value: string | null): string {
-  if (!value) return '—'
+  if (!value) return 'Not recorded'
   return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(value))
 }
 

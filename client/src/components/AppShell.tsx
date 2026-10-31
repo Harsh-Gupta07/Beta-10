@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, BookOpen, CalendarDays, House, LayoutDashboard, LogOut, Menu, Refrigerator, Settings, ShoppingCart, Sparkles, X, type LucideIcon } from 'lucide-react'
+import { Bell, BookOpen, CalendarDays, ClipboardCheck, House, LayoutDashboard, LogOut, Menu, Refrigerator, Settings, ShoppingCart, Sparkles, Sprout, X, type LucideIcon } from 'lucide-react'
 import { api, type AppNotification } from '../lib/api'
 import { useSession } from '../lib/session'
 import { relativeTime } from '../lib/format'
@@ -13,7 +13,8 @@ export const navItems: NavItem[] = [
   { to: '/recipes', label: 'Recipes', short: 'Recipes', icon: BookOpen },
   { to: '/pantry', label: 'Pantry', short: 'Pantry', icon: Refrigerator },
   { to: '/shopping', label: 'Shopping List', short: 'Shop', icon: ShoppingCart },
-  { to: '/assistant', label: 'AI Assistant', short: 'Assistant', icon: Sparkles },
+  { to: '/verify', label: 'Quick Stock Check', short: 'Check', icon: ClipboardCheck },
+  { to: '/assistant', label: 'Kitchen Assistant', short: 'Assistant', icon: Sparkles },
   { to: '/settings', label: 'Household & Settings', short: 'Settings', icon: Settings },
 ]
 
@@ -28,7 +29,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function Brand() {
-  return <Link className="brand" to="/"><span className="brand-icon">k</span><span>kitchen<span className="brand-light">sync</span></span></Link>
+  return <Link className="brand" to="/"><span className="brand-icon"><Sprout size={20} strokeWidth={2.2} aria-hidden /></span><span>Kitchen<span className="brand-light">Sync</span></span></Link>
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -39,6 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return <div className="app-shell">
     <aside className="sidebar">
       <Brand />
+      <p className="brand-promise">Plan meals around what is actually at home.</p>
       <div className="sidebar-row"><p className="household-chip"><House size={14} aria-hidden />{household.name}</p><NotificationBell /></div>
       <NavLinks />
       {account}

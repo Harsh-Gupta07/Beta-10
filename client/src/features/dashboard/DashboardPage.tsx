@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, BookOpen, CalendarCheck, CalendarDays, ClipboardCheck, PackageCheck, Plus, ShoppingCart, Sparkles, TriangleAlert } from 'lucide-react'
+import { Activity, BookOpen, Boxes, CalendarCheck, CalendarDays, ChefHat, ChevronRight, ClipboardCheck, PackageCheck, Plus, ShoppingCart, Sparkles, TriangleAlert } from 'lucide-react'
 import { api, errorMessage, type Dashboard } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatDay, formatDelta, formatQuantity, relativeDay, relativeTime, slotLabel, statusLabel, transactionLabel } from '../../lib/format'
@@ -8,7 +8,7 @@ import { ShortageList } from '../planner/ShortageList'
 import { Badge, EmptyState, Notice, PageHeader, Spinner } from '../../components/ui'
 
 export function DashboardPage() {
-  const { household } = useSession()
+  const { household, user } = useSession()
   const [data, setData] = useState<Dashboard | null>(null)
   const [error, setError] = useState('')
 
@@ -21,11 +21,12 @@ export function DashboardPage() {
 
 
   return <>
-    <PageHeader eyebrow={data ? formatDay(data.today, 'long').toUpperCase() : 'DASHBOARD'} title="Your kitchen, in sync." description={`${household.name} · usually cooking for ${household.defaultServings}`}
+    <PageHeader eyebrow={data ? formatDay(data.today, 'long').toUpperCase() : 'DASHBOARD'} title={`Good ${greeting()}, ${user.name.split(' ')[0]}`} description={`${household.name}. Usually cooking for ${household.defaultServings}.`}
       actions={<Link className="primary-button" to="/pantry?add=1"><Plus size={16} aria-hidden />Add ingredient</Link>} />
     {error && <Notice onRetry={load}>{error}</Notice>}
     {!data && !error && <Spinner label="Loading dashboard…" />}
     {data && <>
+      <JourneyBar shortages={data.shortages.length} shopping={data.shoppingCount} needsCheck={data.needsCheck} />
       <section className="stat-grid">
         <Stat label="Pantry items" value={data.pantryCount} note="Tracked in your kitchen" to="/pantry" />
         <Stat label="Low or out of stock" value={data.lowStockCount} note="Below your alert level" to="/pantry?view=low" tone={data.lowStockCount ? 'amber' : undefined} />
@@ -91,6 +92,31 @@ export function DashboardPage() {
       {data.needsCheck > 0 && <Link to="/verify" className="callout warning"><TriangleAlert size={18} aria-hidden /><span><strong>{data.needsCheck} item{data.needsCheck === 1 ? '' : 's'} need a quick check.</strong> A 10-second look keeps your plans accurate.</span></Link>}
     </>}
   </>
+}
+
+function greeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'morning'
+  if (hour < 17) return 'afternoon'
+  return 'evening'
+}
+
+function JourneyBar({ shortages, shopping, needsCheck }: { shortages: number; shopping: number; needsCheck: number }) {
+  const stages = [
+    { label: 'Plan', note: 'Choose meals', to: '/planner', icon: CalendarDays },
+    { label: 'Allocate', note: 'Reserve stock', to: '/planner', icon: Boxes },
+    { label: 'Detect', note: shortages ? `${shortages} shortages` : 'All covered', to: '/planner', icon: TriangleAlert, alert: shortages > 0 },
+    { label: 'Shop', note: shopping ? `${shopping} on list` : 'Nothing pending', to: '/shopping', icon: ShoppingCart },
+    { label: 'Cook', note: 'Confirm usage', to: '/planner', icon: ChefHat },
+    { label: 'Verify', note: needsCheck ? `${needsCheck} to check` : 'Stock trusted', to: '/verify', icon: ClipboardCheck, alert: needsCheck > 0 },
+  ]
+  return <section className="journey-card" aria-label="KitchenSync flow">
+    <div className="journey-intro"><p className="eyebrow">THE KITCHENSYNC LOOP</p><h2>From meal idea to trusted stock</h2><p>Every step stays connected, so shortages appear before cooking day.</p></div>
+    <div className="journey-steps">{stages.map(({ label, note, to, icon: Icon, alert }, index) => <div className="journey-step-wrap" key={label}>
+      <Link className={`journey-step ${alert ? 'attention' : ''}`} to={to}><span className="journey-icon"><Icon size={17} aria-hidden /></span><span><strong>{label}</strong><small>{note}</small></span></Link>
+      {index < stages.length - 1 && <ChevronRight className="journey-arrow" size={16} aria-hidden />}
+    </div>)}</div>
+  </section>
 }
 
 function Stat({ label, value, note, to, tone }: { label: string; value: number; note: string; to?: string; tone?: 'amber' }) {

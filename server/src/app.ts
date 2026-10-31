@@ -17,7 +17,9 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 // Pages are only ever framed by nobody and only load our own scripts; fonts come from Google Fonts.
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com", "img-src 'self' data:", "connect-src 'self'",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: https://upload.wikimedia.org",
+  "connect-src 'self' https://commons.wikimedia.org",
   "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'",
 ].join('; ')
 
