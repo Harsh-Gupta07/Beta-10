@@ -16,7 +16,6 @@ export function ShoppingPage() {
   const [notice, setNotice] = useState('')
   const [receiving, setReceiving] = useState<ShoppingItem | null>(null)
   const [adding, setAdding] = useState(false)
-  const [today, setToday] = useState('')
 
   const load = useCallback(async () => {
     setError('')
@@ -24,7 +23,6 @@ export function ShoppingPage() {
     catch (err) { setError(errorMessage(err, 'Your shopping list could not be loaded.')) }
   }, [base])
   useEffect(() => { void load() }, [load])
-  useEffect(() => { api.get<{ today: string }>(`/households/${household.id}/planner`).then(r => setToday(r.data.today)).catch(() => undefined) }, [household.id])
 
   async function run(request: () => Promise<unknown>, success?: string) {
     setError(''); setNotice('')
@@ -72,7 +70,7 @@ export function ShoppingPage() {
         </div>
         <ul className="shortage-list">{data.suggestions.map(s => <li key={s.ingredient.id}>
           <span className="shortage-main"><strong>{s.ingredient.name}</strong>
-            <small>Needed for {s.affectedMeals} meal{s.affectedMeals === 1 ? '' : 's'}, first {today ? relativeDay(s.firstAffected.date, today).toLowerCase() : s.firstAffected.date} {slotLabel[s.firstAffected.slot].toLowerCase()} ({s.firstAffected.recipeName}){s.onList !== '0' && ` · ${formatQuantity(s.onList, s.unit)} already listed`}</small></span>
+            <small>Needed for {s.affectedMeals} meal{s.affectedMeals === 1 ? '' : 's'}, first {relativeDay(s.firstAffected.date, data.today).toLowerCase()} {slotLabel[s.firstAffected.slot].toLowerCase()} ({s.firstAffected.recipeName}){s.onList !== '0' && ` · ${formatQuantity(s.onList, s.unit)} already listed`}</small></span>
           <span className="shortage-side"><span className="shortage-qty">Buy {formatQuantity(s.suggested, s.unit)}</span>
             <button className="link-button small" onClick={() => run(() => api.post(`${base}/add-shortages`, { ingredientIds: [s.ingredient.id] }), `${s.ingredient.name} added.`)}>Add to list</button></span>
         </li>)}</ul>

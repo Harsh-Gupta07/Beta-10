@@ -9,5 +9,6 @@ async function shutdown() {
   server.close()
   await Promise.all([prisma.$disconnect(), pgPool.end()])
 }
+process.on('unhandledRejection', error => console.error('Unhandled promise rejection', error))
 process.on('SIGINT', () => void shutdown())
 process.on('SIGTERM', () => void shutdown())

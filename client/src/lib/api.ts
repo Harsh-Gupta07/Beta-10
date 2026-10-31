@@ -13,7 +13,11 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
     const data = error.response.data as { error?: string; details?: Array<{ path: string; message: string }> } | undefined
     if (data?.details?.length) return `${data.error ?? fallback} (${data.details.map(d => `${d.path || 'request'}: ${d.message}`).join('; ')})`
     // No API error body means something in between answered (dev proxy, gateway): say so instead of hiding it.
-    return data?.error ?? `${fallback} The server responded with ${error.response.status} ${error.response.statusText}; check that the API is running and restart \`npm run dev\`.`
+    if (data?.error) return data.error
+    if (error.response.status === 429) return 'Too many requests. Please wait a moment and try again.'
+    return import.meta.env.DEV
+      ? `${fallback} The server responded with ${error.response.status} ${error.response.statusText}; check that the API is running and restart \`npm run dev\`.`
+      : `${fallback} (server error ${error.response.status})`
   }
   return fallback
 }
@@ -149,7 +153,7 @@ export type ShoppingSuggestion = {
   ingredient: { id: string; name: string; category: string }; unit: CanonicalUnit
   shortage: string; onList: string; suggested: string; affectedMeals: number; firstAffected: Shortage['firstAffected']
 }
-export type ShoppingData = { items: ShoppingItem[]; suggestions: ShoppingSuggestion[] }
+export type ShoppingData = { today: string; items: ShoppingItem[]; suggestions: ShoppingSuggestion[] }
 
 export type VerificationEntry = { item: PantryItem; reasons: string[]; score: number; neededBy: number; priority: 'HIGH' | 'MEDIUM' | 'LOW' }
 

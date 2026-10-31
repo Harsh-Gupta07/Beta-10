@@ -5,8 +5,9 @@ import type { Server } from 'node:http'
 import { createApp } from '../app.js'
 import { prisma } from '../lib/prisma.js'
 
-export type Res = { status: number; body: any }
-export type Client = (method: string, path: string, body?: unknown) => Promise<Res>
+export type Res = { status: number; body: any; headers: Headers }
+/** `origin` simulates a browser's Origin header; `rawBody` sends `body` as-is instead of JSON. */
+export type Client = (method: string, path: string, body?: unknown, options?: { origin?: string; rawBody?: boolean }) => Promise<Res>
 
 let base = ''
 
@@ -30,16 +31,16 @@ export function useTestServer() {
 /** A fetch wrapper that keeps its own session cookie, like one browser. */
 export function client(): Client {
   let cookie = ''
-  return async (method, path, body) => {
+  return async (method, path, body, options = {}) => {
     const response = await fetch(base + path, {
       method,
-      headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}), ...(options.origin ? { origin: options.origin } : {}) },
+      body: body === undefined ? undefined : options.rawBody ? String(body) : JSON.stringify(body),
     })
     const setCookie = response.headers.getSetCookie()[0]
     if (setCookie) cookie = setCookie.split(';')[0]!
     const text = await response.text()
-    return { status: response.status, body: text ? JSON.parse(text) : null }
+    return { status: response.status, body: text ? JSON.parse(text) : null, headers: response.headers }
   }
 }
 

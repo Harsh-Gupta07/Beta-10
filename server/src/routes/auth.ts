@@ -3,9 +3,18 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { requireUser } from '../middleware/auth.js'
+import { env } from '../config/env.js'
+import { rateLimit } from '../lib/rateLimit.js'
 
 export const authRouter = Router()
 const credentials = z.object({ email: z.string().trim().email().max(254).transform(value => value.toLowerCase()), password: z.string().min(10).max(128) })
+
+// Compared against when the email is unknown, so response time doesn't reveal which emails exist.
+const DUMMY_HASH = bcrypt.hashSync('timing-equaliser-not-a-real-password', 12)
+
+const emailOf = (body: unknown) => typeof body === 'object' && body && 'email' in body ? String(body.email).trim().toLowerCase().slice(0, 254) : ''
+const loginLimit = rateLimit({ windowMs: 15 * 60_000, max: env.RATE_LIMIT_LOGIN, key: req => `${req.ip}|${emailOf(req.body)}`, message: 'Too many sign-in attempts. Please wait 15 minutes and try again.' })
+const registerLimit = rateLimit({ windowMs: 60 * 60_000, max: env.RATE_LIMIT_REGISTER, key: req => req.ip ?? 'unknown', message: 'Too many accounts created from this network. Please try again later.' })
 
 function regenerate(req: Express.Request): Promise<void> {
   return new Promise((resolve, reject) => req.session.regenerate(error => error ? reject(error) : resolve()))
@@ -14,7 +23,7 @@ function save(req: Express.Request): Promise<void> {
   return new Promise((resolve, reject) => req.session.save(error => error ? reject(error) : resolve()))
 }
 
-authRouter.post('/register', async (req, res, next) => {
+authRouter.post('/register', registerLimit, async (req, res, next) => {
   try {
     const input = credentials.extend({ name: z.string().trim().min(1).max(80) }).parse(req.body)
     const passwordHash = await bcrypt.hash(input.password, 12)
@@ -24,11 +33,12 @@ authRouter.post('/register', async (req, res, next) => {
   } catch (error) { next(error) }
 })
 
-authRouter.post('/login', async (req, res, next) => {
+authRouter.post('/login', loginLimit, async (req, res, next) => {
   try {
     const input = credentials.parse(req.body)
     const user = await prisma.user.findUnique({ where: { email: input.email } })
-    if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) return res.status(401).json({ error: 'Email or password is incorrect.' })
+    const valid = await bcrypt.compare(input.password, user?.passwordHash ?? DUMMY_HASH)
+    if (!user || !valid) return res.status(401).json({ error: 'Email or password is incorrect.' })
     await regenerate(req); req.session.userId = user.id; await save(req)
     const membership = await prisma.householdMember.findFirst({ where: { userId: user.id }, include: { household: true }, orderBy: { joinedAt: 'asc' } })
     res.json({ user: { id: user.id, name: user.name, email: user.email }, household: membership?.household ?? null })
@@ -64,7 +74,7 @@ authRouter.post('/password', requireUser, async (req, res, next) => {
 authRouter.post('/logout', (req, res, next) => {
   req.session.destroy(error => {
     if (error) return next(error)
-    res.clearCookie('kitchensync.sid', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' })
+    res.clearCookie('kitchensync.sid', { httpOnly: true, sameSite: 'lax', secure: env.COOKIE_SECURE })
     res.status(204).end()
   })
 })

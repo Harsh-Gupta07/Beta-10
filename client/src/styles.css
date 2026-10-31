@@ -4,7 +4,7 @@
 :root {
   --ink: #1f2a37;          /* dark navy primary text */
   --ink-soft: #3d4a57;
-  --muted: #74807a;
+  --muted: #66716a;           /* 4.9:1 on white (WCAG AA) */
   --line: #e6e9e2;
   --line-strong: #d9ded6;
   --bg: #f7f8f4;           /* warm white */
@@ -555,4 +555,11 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
   .chat { max-height: none; }
   .chat-input { bottom: 64px; }
   .bubble { max-width: 94%; }
+}
+
+/* ---------- Release 1.1 fixes ---------- */
+/* Tailwind's preflight makes every svg a block; icons inside headings must stay on the text line. */
+.inline-icon { display: inline-block; }
+@media (max-width: 760px) {
+  .usage-table li > span[data-label]::before { content: attr(data-label); display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: #8a958c; margin-bottom: 2px; }
 }

@@ -71,9 +71,9 @@ export function CookingDialog({ mealId, onClose, onChanged }: Props) {
           <li className="head"><span>Ingredient</span><span>Recipe</span><span>In pantry</span><span>{done ? 'Deducted' : 'Used'}</span></li>
           {view.lines.map(line => <li key={line.ingredient.id}>
             <span><strong>{line.ingredient.name}</strong>{line.note && <small>{line.note}</small>}</span>
-            <span>{formatQuantity(line.planned, line.unit)}</span>
-            <span>{line.inPantry === null ? <Badge tone="grey">Not tracked</Badge> : formatQuantity(line.inPantry, line.unit)}</span>
-            <span>{done
+            <span data-label="Recipe">{formatQuantity(line.planned, line.unit)}</span>
+            <span data-label="In pantry">{line.inPantry === null ? <Badge tone="grey">Not tracked</Badge> : formatQuantity(line.inPantry, line.unit)}</span>
+            <span data-label={done ? 'Deducted' : 'Used'}>{done
               ? (line.used ? formatQuantity(line.used, line.unit) : '—')
               : <span className="quantity-input compact">
                   <input value={usage[line.ingredient.id]?.quantity ?? ''} inputMode="decimal" pattern="\d+(\.\d+)?" aria-label={`${line.ingredient.name} used`}

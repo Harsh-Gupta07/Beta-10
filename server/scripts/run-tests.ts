@@ -15,7 +15,8 @@ if (!dbName.includes('test') || url === process.env.DATABASE_URL) {
 }
 
 // AI_API_KEY is blanked so tests exercise the offline fallback and never spend real API quota.
-const env = { ...process.env, DATABASE_URL: url, NODE_ENV: 'test', AI_API_KEY: '' }
+// Every test registers fresh users from 127.0.0.1, so the per-IP registration limit is lifted here.
+const env = { ...process.env, DATABASE_URL: url, NODE_ENV: 'test', AI_API_KEY: '', RATE_LIMIT_REGISTER: '100000' }
 function run(command: string) {
   const result = spawnSync(command, { shell: true, stdio: 'inherit', env })
   if (result.status !== 0) process.exit(result.status ?? 1)

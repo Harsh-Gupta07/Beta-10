@@ -31,7 +31,7 @@ export function PantryPage() {
   }, [household.id])
   useEffect(() => { void load() }, [load])
 
-  const all = items ?? []
+  const all = useMemo(() => items ?? [], [items])
   const counts = useMemo(() => countByView(all), [all])
   const categories = useMemo(() => categoriesOf(all), [all])
   const groups = useMemo(() => groupPantry(all, { view, category, search }), [all, view, category, search])

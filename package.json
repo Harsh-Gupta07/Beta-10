@@ -2,7 +2,10 @@
   "name": "kitchensync",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["client", "server"],
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "npm --workspace client run dev",
@@ -11,7 +14,11 @@
     "db:generate": "npm --workspace server run db:generate",
     "db:migrate": "npm --workspace server run db:migrate",
     "db:seed": "npm --workspace server run db:seed",
-    "test": "npm --workspace server run test"
+    "test": "npm --workspace server run test",
+    "start": "npm --workspace server run start",
+    "db:deploy": "npm --workspace server run db:deploy",
+    "db:seed:prod": "npm --workspace server run db:seed:prod",
+    "build:deploy": "npm --workspace server run build:deploy && npm --workspace client run build"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

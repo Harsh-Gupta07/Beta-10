@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { api, errorMessage, type Household, type User } from './lib/api'
 import { SessionContext, type Session } from './lib/session'
@@ -7,14 +7,16 @@ import { Spinner } from './components/ui'
 import { AuthScreen } from './features/auth/AuthScreen'
 import { HouseholdSetup } from './features/household/HouseholdSetup'
 import { DashboardPage } from './features/dashboard/DashboardPage'
-import { PantryPage } from './features/pantry/PantryPage'
-import { RecipesPage } from './features/recipes/RecipesPage'
-import { RecipeDetailPage } from './features/recipes/RecipeDetailPage'
-import { PlannerPage } from './features/planner/PlannerPage'
-import { ShoppingPage } from './features/shopping/ShoppingPage'
-import { VerifyPage } from './features/verification/VerifyPage'
-import { AssistantPage } from './features/assistant/AssistantPage'
-import { SettingsPage } from './features/settings/SettingsPage'
+
+// Pages other than the dashboard load on demand, keeping the first download small.
+const PantryPage = lazy(() => import('./features/pantry/PantryPage').then(m => ({ default: m.PantryPage })))
+const RecipesPage = lazy(() => import('./features/recipes/RecipesPage').then(m => ({ default: m.RecipesPage })))
+const RecipeDetailPage = lazy(() => import('./features/recipes/RecipeDetailPage').then(m => ({ default: m.RecipeDetailPage })))
+const PlannerPage = lazy(() => import('./features/planner/PlannerPage').then(m => ({ default: m.PlannerPage })))
+const ShoppingPage = lazy(() => import('./features/shopping/ShoppingPage').then(m => ({ default: m.ShoppingPage })))
+const VerifyPage = lazy(() => import('./features/verification/VerifyPage').then(m => ({ default: m.VerifyPage })))
+const AssistantPage = lazy(() => import('./features/assistant/AssistantPage').then(m => ({ default: m.AssistantPage })))
+const SettingsPage = lazy(() => import('./features/settings/SettingsPage').then(m => ({ default: m.SettingsPage })))
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -49,6 +51,7 @@ function App() {
 
   return <SessionContext.Provider value={session}>
     <AppShell>
+      <Suspense fallback={<Spinner label="Loading…" />}>
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/planner" element={<PlannerPage />} />
@@ -61,6 +64,7 @@ function App() {
         <Route path="/settings" element={<SettingsPage onSessionChange={refresh} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </AppShell>
   </SessionContext.Provider>
 }

@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js'
 import { AppError, notFound } from '../lib/errors.js'
 import { receiveStockTx } from './pantry.js'
 import { getShortages } from './planner.js'
+import { localToday } from './dates.js'
 import { isCanonicalUnit, toCanonical, unitsFor, type InputUnit } from './units.js'
 
 type Tx = Prisma.TransactionClient
@@ -40,7 +41,8 @@ export async function getShoppingList(householdId: string) {
   const id = await listId(householdId)
   const items = await prisma.shoppingListItem.findMany({ where: { shoppingListId: id }, include: itemInclude, orderBy: { createdAt: 'asc' } })
   const sorted = [...items].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || (a.ingredient?.category ?? 'Other').localeCompare(b.ingredient?.category ?? 'Other') || (a.ingredient?.name ?? a.name).localeCompare(b.ingredient?.name ?? b.name))
-  return { items: sorted.map(serialize), suggestions: await suggestions(householdId, items) }
+  const { timezone } = await prisma.household.findUniqueOrThrow({ where: { id: householdId }, select: { timezone: true } })
+  return { today: localToday(timezone), items: sorted.map(serialize), suggestions: await suggestions(householdId, items) }
 }
 
 export type AddItemInput = { ingredientId?: string; name?: string; quantity: string | number; unit?: string; note?: string; source?: 'MANUAL' | 'SHORTAGE' | 'ASSISTANT' }

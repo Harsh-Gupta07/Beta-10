@@ -14,12 +14,17 @@ import * as households from '../services/household.js'
 import { listNotifications, markAllRead } from '../services/notifications.js'
 import { getVerificationQueue } from '../services/verification.js'
 import type { HouseholdRole } from '@prisma/client'
+import { env } from '../config/env.js'
+import { rateLimit } from '../lib/rateLimit.js'
 
 export const householdRouter = Router()
 householdRouter.use(requireUser)
 
+// Slows down invite-code guessing.
+const joinLimit = rateLimit({ windowMs: 15 * 60_000, max: env.RATE_LIMIT_JOIN, key: (_req, res) => (res.locals.user as { id: string }).id, message: 'Too many attempts to join. Please wait a few minutes and check the code.' })
+
 // Must be registered before the '/:householdId' middleware, which would treat "join" as an id.
-householdRouter.post('/join', async (req, res) => {
+householdRouter.post('/join', joinLimit, async (req, res) => {
   const { code } = z.object({ code: z.string().trim().min(4).max(20) }).parse(req.body)
   res.status(201).json(await households.joinHousehold((res.locals.user as { id: string }).id, code))
 })
@@ -69,6 +74,8 @@ householdRouter.post('/', async (req, res, next) => {
   try {
     const input = z.object({ name: z.string().trim().min(2).max(80), defaultServings: z.coerce.number().int().min(1).max(20) }).parse(req.body)
     const user = res.locals.user as { id: string }
+    // Phase 1 is one household per user; a second one would be unreachable from the app.
+    if (await prisma.householdMember.findFirst({ where: { userId: user.id }, select: { id: true } })) return res.status(409).json({ error: 'You already belong to a household.' })
     const household = await prisma.household.create({ data: { ...input, members: { create: { userId: user.id, role: 'OWNER' } }, shoppingLists: { create: { name: 'Weekly shopping' } } } })
     res.status(201).json(household)
   } catch (error) { next(error) }
