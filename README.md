@@ -1,8 +1,6 @@
 # KitchenSync (Beta-10)
 
-KitchenSync is a household kitchen assistant for planning meals, tracking what is in your kitchen, and knowing what to buy. It keeps everything connected:
-
-**Plan → Allocate → Detect shortage → Shop → Cook → Deduct → Verify**
+KitchenSync is a household kitchen assistant for planning meals, tracking what is in your kitchen, and knowing what to buy. It keeps everything connected: **Plan → Allocate → Detect shortage → Shop → Cook → Deduct → Verify**.
 
 You plan meals for the week. KitchenSync reserves the ingredients those meals need from your pantry, warns you early about anything you'll run short of, builds your shopping list, and updates your stock when you actually cook or receive groceries.
 
@@ -307,6 +305,14 @@ The free tier allows only a few requests per minute, and one question can take 2
 | `npm run db:seed` | Load the ingredient catalog and 15 recipes (safe to re-run) |
 | `npm test` | Run all tests |
 | `npm run build` | Production build of server and client |
+| `npm run build:deploy` | Deployment build: generates Prisma Client, then builds server and client |
+| `npm run db:deploy` | Apply migrations in staging/production (`prisma migrate deploy`, never resets data) |
+| `npm run db:seed:prod` | Seed using the compiled script (no dev tools needed) |
+| `npm start` | Start the built server (`server/dist/src/index.js`) |
+
+### Deploying to staging
+
+See **[RELEASE-READINESS.md](RELEASE-READINESS.md)**: audit results, required environment variables (`TRUST_PROXY`, `SERVE_CLIENT`, …), database provisioning, HTTPS and cookie requirements, health checks and logging.
 
 ### Project layout
 
