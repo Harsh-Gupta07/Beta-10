@@ -726,3 +726,8 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
 @media (max-width: 960px) { .landing .mobile-only { display: block; margin-bottom: 18px; } .landing-story > .brand { display: none; } }
 .demo-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0 0 18px; padding: 10px 14px; border-radius: 12px; background: var(--amber-bg); color: #7d4710; font-size: 13px; }
 .demo-banner .link-button { font-weight: 700; color: #7d4710; text-decoration: underline; }
+.google-button-slot { display: flex; justify-content: center; min-height: 44px; }
+.phone-preview { display: grid; gap: 8px; padding: 14px; border: 1px dashed var(--line-strong); border-radius: 12px; background: var(--mint-soft); }
+.phone-row { display: flex; gap: 8px; }
+.phone-prefix { display: grid; place-items: center; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: #fff; font-weight: 600; font-size: 14px; }
+.phone-row input { flex: 1; min-width: 0; }

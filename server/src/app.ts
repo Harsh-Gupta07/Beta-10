@@ -16,11 +16,13 @@ import { meRouter } from './routes/me.js'
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 // Pages are only ever framed by nobody and only load our own scripts; fonts come from Google Fonts.
+// accounts.google.com/gsi/ is Google's sign-in button (script, frame and styles), nothing else from Google.
+const GOOGLE_SIGN_IN = 'https://accounts.google.com/gsi/'
 const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "default-src 'self'", `script-src 'self' ${GOOGLE_SIGN_IN}client`, `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com ${GOOGLE_SIGN_IN}style`,
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: https://upload.wikimedia.org",
-  "connect-src 'self' https://commons.wikimedia.org",
+  `connect-src 'self' https://commons.wikimedia.org ${GOOGLE_SIGN_IN}`, `frame-src ${GOOGLE_SIGN_IN}`,
   "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'",
 ].join('; ')
 

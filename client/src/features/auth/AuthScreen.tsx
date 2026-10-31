@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { CalendarCheck, PlayCircle, ShieldCheck, ShoppingBasket } from 'lucide-react'
+import { CalendarCheck, PlayCircle, ShieldCheck, ShoppingBasket, Smartphone } from 'lucide-react'
 import { api, errorMessage } from '../../lib/api'
 import { LANDING_PHOTOS } from '../../lib/images'
 import { Brand } from '../../components/AppShell'
 import { Notice } from '../../components/ui'
 import { PasswordInput } from '../../components/PasswordInput'
+import { GoogleButton } from './GoogleButton'
 
 type Providers = { google: { clientId: string } | null; apple: null }
 
@@ -19,7 +20,8 @@ export function AuthScreen({ onSignedIn, error }: { onSignedIn: () => Promise<vo
   const [mode, setMode] = useState<'signin' | 'register'>('signin')
   const [providers, setProviders] = useState<Providers | null>(null)
   const [message, setMessage] = useState('')
-  const [busy, setBusy] = useState<'' | 'email' | 'demo'>('')
+  const [busy, setBusy] = useState<'' | 'email' | 'demo' | 'google'>('')
+  const [phoneOpen, setPhoneOpen] = useState(false)
   const register = mode === 'register'
 
   useEffect(() => { api.get<Providers>('/auth/providers').then(r => setProviders(r.data)).catch(() => setProviders({ google: null, apple: null })) }, [])
@@ -29,6 +31,13 @@ export function AuthScreen({ onSignedIn, error }: { onSignedIn: () => Promise<vo
     const fields = Object.fromEntries(new FormData(event.currentTarget))
     try { await api.post(`/auth/${register ? 'register' : 'login'}`, fields); await onSignedIn() }
     catch (err) { setMessage(errorMessage(err, register ? 'Could not create your account. Please try again.' : 'Sign in failed. Please try again.')) }
+    finally { setBusy('') }
+  }
+
+  async function google(credential: string) {
+    setMessage(''); setBusy('google')
+    try { await api.post('/auth/google', { credential }); await onSignedIn() }
+    catch (err) { setMessage(errorMessage(err, 'Google sign-in failed. Please try again.')) }
     finally { setBusy('') }
   }
 
@@ -62,10 +71,13 @@ export function AuthScreen({ onSignedIn, error }: { onSignedIn: () => Promise<vo
       {(message || error) && <Notice>{message || error}</Notice>}
 
       <div className="social-buttons">
-        <button type="button" className="social-button" disabled={!providers?.google} aria-describedby={providers && !providers.google ? 'google-note' : undefined}>
-          <GoogleMark />Continue with Google
-        </button>
+        {providers?.google
+          ? <GoogleButton clientId={providers.google.clientId} onCredential={google} />
+          : <button type="button" className="social-button" disabled aria-describedby="google-note"><GoogleMark />Continue with Google</button>}
+        {busy === 'google' && <small className="muted">Signing you in with Google…</small>}
         <button type="button" className="social-button" disabled aria-describedby="apple-note"><AppleMark />Continue with Apple</button>
+        <button type="button" className="social-button" onClick={() => setPhoneOpen(!phoneOpen)} aria-expanded={phoneOpen}><Smartphone size={17} aria-hidden />Continue with phone number</button>
+        {phoneOpen && <PhonePreview />}
         {providers && !providers.google && <small id="google-note" className="muted">Google sign-in is being set up.</small>}
         <small id="apple-note" className="muted">Apple sign-in is coming soon.</small>
       </div>
@@ -82,6 +94,21 @@ export function AuthScreen({ onSignedIn, error }: { onSignedIn: () => Promise<vo
       <p className="switch-auth">{register ? 'Already have an account?' : 'New to KitchenSync?'} <button type="button" onClick={() => { setMode(register ? 'signin' : 'register'); setMessage('') }}>{register ? 'Sign in' : 'Create an account'}</button></p>
     </section>
   </main>
+}
+
+/** Placeholder for OTP sign-in: shows the flow, but sending codes isn't connected yet. */
+function PhonePreview() {
+  const [number, setNumber] = useState('')
+  return <div className="phone-preview">
+    <label className="field-label" htmlFor="phone-number">Mobile number</label>
+    <div className="phone-row">
+      <span className="phone-prefix">+91</span>
+      <input id="phone-number" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} placeholder="98765 43210"
+        value={number} onChange={e => setNumber(e.target.value.replace(/\D/g, ''))} />
+    </div>
+    <button type="button" className="secondary-button" disabled>Send code</button>
+    <small className="muted">Sign-in with a one-time code is coming soon. Use Google, email or the demo for now.</small>
+  </div>
 }
 
 function GoogleMark() {

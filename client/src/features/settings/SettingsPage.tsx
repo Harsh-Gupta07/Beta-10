@@ -65,8 +65,8 @@ export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promi
         </div>
       </section>
 
-      <ProfileCard name={user.name} email={user.email} onSaveName={name => run(() => api.patch('/auth/me', { name }), 'Name updated.', true)}
-        onChangePassword={(currentPassword, newPassword) => run(() => api.post('/auth/password', { currentPassword, newPassword }), 'Password changed.')} />
+      <ProfileCard name={user.name} email={user.email} hasPassword={user.hasPassword !== false} isDemo={user.isDemo === true} onSaveName={name => run(() => api.patch('/auth/me', { name }), 'Name updated.', true)}
+        onChangePassword={(currentPassword, newPassword) => run(() => api.post('/auth/password', { currentPassword: currentPassword || undefined, newPassword }), user.hasPassword === false ? 'Password set. You can now also sign in with email.' : 'Password changed.', true)} />
 
       <section className="panel">
         <p className="eyebrow">AI ASSISTANT</p><h2 className="panel-title"><Sparkles size={16} aria-hidden className="inline-icon" />Kitchen assistant</h2>
@@ -97,7 +97,7 @@ function HouseholdCard({ details, owner, onSave }: { details: HouseholdDetails; 
   </section>
 }
 
-function ProfileCard({ name, email, onSaveName, onChangePassword }: { name: string; email: string; onSaveName: (name: string) => Promise<void>; onChangePassword: (current: string, next: string) => Promise<void> }) {
+function ProfileCard({ name, email, hasPassword, isDemo, onSaveName, onChangePassword }: { name: string; email: string; hasPassword: boolean; isDemo: boolean; onSaveName: (name: string) => Promise<void>; onChangePassword: (current: string, next: string) => Promise<void> }) {
   const [value, setValue] = useState(name)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
@@ -107,11 +107,13 @@ function ProfileCard({ name, email, onSaveName, onChangePassword }: { name: stri
       <Field label="Display name"><input value={value} onChange={e => setValue(e.target.value)} maxLength={80} required /></Field>
       <button className="secondary-button" disabled={value.trim() === name}>Save name</button>
     </form>
-    <form className="stack-form tight password-form" onSubmit={async e => { e.preventDefault(); await onChangePassword(current, next); setCurrent(''); setNext('') }}>
-      <h3><KeyRound size={15} aria-hidden className="inline-icon" />Change password</h3>
-      <Field label="Current password"><PasswordInput value={current} onChange={e => setCurrent(e.target.value)} autoComplete="current-password" required /></Field>
+    {!isDemo && <form className="stack-form tight password-form" onSubmit={async e => { e.preventDefault(); await onChangePassword(current, next); setCurrent(''); setNext('') }}>
+      <h3><KeyRound size={15} aria-hidden className="inline-icon" />{hasPassword ? 'Change password' : 'Set a password'}</h3>
+      {hasPassword
+        ? <Field label="Current password"><PasswordInput value={current} onChange={e => setCurrent(e.target.value)} autoComplete="current-password" required /></Field>
+        : <p className="muted small">You signed up with Google. Add a password if you also want to sign in with email.</p>}
       <Field label="New password" hint="At least 10 characters."><PasswordInput value={next} onChange={e => setNext(e.target.value)} minLength={10} autoComplete="new-password" required /></Field>
-      <button className="secondary-button">Change password</button>
-    </form>
+      <button className="secondary-button">{hasPassword ? 'Change password' : 'Set password'}</button>
+    </form>}
   </section>
 }

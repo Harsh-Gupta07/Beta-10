@@ -109,6 +109,10 @@ model User {
   name         String
   email        String            @unique
   passwordHash String
+  /// Google's stable account id ("sub") once the user signs in with Google.
+  googleSub    String?           @unique
+  /// False for accounts created through Google until they choose a password.
+  hasPassword  Boolean           @default(true)
   /// Set only for "See a demo kitchen" accounts; the account and its household are deleted after this time.
   demoExpiresAt DateTime?
   createdAt    DateTime          @default(now())

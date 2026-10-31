@@ -24,7 +24,7 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
 
 export type Household = { id: string; name: string; defaultServings: number }
 /** isDemo marks a "See a demo kitchen" visitor; their kitchen is deleted at demoExpiresAt. */
-export type User = { id: string; name: string; email: string; isDemo?: boolean; demoExpiresAt?: string }
+export type User = { id: string; name: string; email: string; hasPassword?: boolean; isDemo?: boolean; demoExpiresAt?: string }
 
 export type CanonicalUnit = 'g' | 'ml' | 'count'
 export type InputUnit = 'g' | 'kg' | 'ml' | 'l' | 'pcs'

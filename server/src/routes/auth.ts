@@ -6,6 +6,7 @@ import { requireUser } from '../middleware/auth.js'
 import { env } from '../config/env.js'
 import { rateLimit } from '../lib/rateLimit.js'
 import { createDemoKitchen } from '../services/demo.js'
+import { accountForGoogle, verifyGoogleCredential } from '../services/googleAuth.js'
 
 export const authRouter = Router()
 const credentials = z.object({ email: z.string().trim().email().max(254).transform(value => value.toLowerCase()), password: z.string().min(10).max(128) })
@@ -37,6 +38,19 @@ authRouter.post('/demo', demoLimit, async (req, res, next) => {
     const userId = await createDemoKitchen()
     await regenerate(req); req.session.userId = userId; await save(req)
     res.status(201).json({ demo: true })
+  } catch (error) { next(error) }
+})
+
+const googleLimit = rateLimit({ windowMs: 15 * 60_000, max: env.RATE_LIMIT_REGISTER, key: req => `google|${req.ip}`, message: 'Too many sign-in attempts. Please wait a few minutes and try again.' })
+
+/** "Continue with Google": verifies Google's ID token, then signs in, links or creates the account. */
+authRouter.post('/google', googleLimit, async (req, res, next) => {
+  try {
+    const { credential } = z.object({ credential: z.string().min(20).max(4096) }).parse(req.body)
+    const { userId, isNew } = await accountForGoogle(await verifyGoogleCredential(credential))
+    await regenerate(req); req.session.userId = userId; await save(req)
+    const membership = await prisma.householdMember.findFirst({ where: { userId }, include: { household: true }, orderBy: { joinedAt: 'asc' } })
+    res.status(isNew ? 201 : 200).json({ isNew, household: membership?.household ?? null })
   } catch (error) { next(error) }
 })
 
@@ -80,10 +94,12 @@ authRouter.patch('/me', requireUser, async (req, res, next) => {
 
 authRouter.post('/password', requireUser, async (req, res, next) => {
   try {
-    const input = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(10).max(128) }).parse(req.body)
+    const input = z.object({ currentPassword: z.string().max(128).optional(), newPassword: z.string().min(10).max(128) }).parse(req.body)
     const user = await prisma.user.findUniqueOrThrow({ where: { id: (res.locals.user as { id: string }).id } })
-    if (!(await bcrypt.compare(input.currentPassword, user.passwordHash))) return res.status(400).json({ error: 'Your current password is incorrect.' })
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(input.newPassword, 12) } })
+    if (user.demoExpiresAt) return res.status(403).json({ error: 'Demo kitchens can’t have a password. Create your own account to keep your data.' })
+    // Accounts made with Google have no password yet, so there is nothing to confirm the first time.
+    if (user.hasPassword && !(await bcrypt.compare(input.currentPassword ?? '', user.passwordHash))) return res.status(400).json({ error: 'Your current password is incorrect.' })
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(input.newPassword, 12), hasPassword: true } })
     res.status(204).end()
   } catch (error) { next(error) }
 })
