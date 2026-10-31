@@ -5,6 +5,7 @@ import { api, type AppNotification } from '../lib/api'
 import { useSession } from '../lib/session'
 import { relativeTime } from '../lib/format'
 import { trapTab } from './ui'
+import { useToast } from './Toast'
 
 type NavItem = { to: string; label: string; short: string; icon: LucideIcon }
 
@@ -99,15 +100,28 @@ function NotificationBell() {
     document.addEventListener('mousedown', onDown)
     return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown) }
   }, [open])
+  const toast = useToast()
+  const seen = useRef<Set<string> | null>(null)
+  // Refreshes on navigation and every 45 seconds. Anything new from someone else pops up once as a toast,
+  // so changes made by the rest of the household are noticed without opening the bell.
   useEffect(() => {
-    api.get(`/households/${household.id}/notifications`).then(r => setData(r.data)).catch(() => undefined)
-  }, [household.id, location.pathname])
+    const check = () => api.get<{ unread: number; items: AppNotification[] }>(`/households/${household.id}/notifications`).then(({ data: next }) => {
+      const fresh = seen.current ? next.items.filter(n => !n.read && !seen.current!.has(n.id)) : []
+      seen.current = new Set(next.items.map(n => n.id))
+      if (fresh.length === 1) toast.info(fresh[0]!.title)
+      else if (fresh.length > 1) toast.info(`${fresh.length} new updates from your household. Open the bell to see them.`)
+      setData(next)
+    }).catch(() => undefined)
+    void check()
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') void check() }, 45_000)
+    return () => clearInterval(timer)
+  }, [household.id, location.pathname, toast])
   async function toggle() {
     const next = !open
     setOpen(next)
     if (next && data.unread) {
       await api.post(`/households/${household.id}/notifications/read`).catch(() => undefined)
-      setData(prev => ({ ...prev, unread: 0 }))
+      setData(prev => ({ ...prev, unread: 0, items: prev.items.map(n => ({ ...n, read: true })) }))
     }
   }
   return <div ref={bell} className="bell">
@@ -117,7 +131,7 @@ function NotificationBell() {
     {open && <div className="bell-panel" role="dialog" aria-label="Notifications">
       <div className="bell-head"><strong>Notifications</strong><button className="icon-button" onClick={() => setOpen(false)} aria-label="Close"><X size={15} /></button></div>
       {data.items.length ? <ul>{data.items.map(n => <li key={n.id}>
-        <button onClick={() => { setOpen(false); if (n.link) navigate(n.link) }}>
+        <button className={n.read ? '' : 'unread'} onClick={() => { setOpen(false); if (n.link) navigate(n.link) }}>
           <strong>{n.title}</strong><span>{n.body}</span><small>{relativeTime(n.createdAt)}</small>
         </button>
       </li>)}</ul> : <p className="muted small">No notifications yet. You will see one here when a stock change affects a planned meal.</p>}

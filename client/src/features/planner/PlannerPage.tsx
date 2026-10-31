@@ -5,6 +5,7 @@ import { api, errorMessage, type MealSlot, type PlannedMeal, type PlannerWeek, t
 import { useSession } from '../../lib/session'
 import { addDays, formatDay, slotLabel, slots, statusLabel } from '../../lib/format'
 import { Badge, Notice, PageHeader, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { AddMealDialog } from './AddMealDialog'
 import { MealSheet } from './MealSheet'
 import { ShortageList } from './ShortageList'
@@ -21,7 +22,7 @@ export function PlannerPage() {
   const [openMealId, setOpenMealId] = useState<string | null>(null)
   const [showAllShortages, setShowAllShortages] = useState(false)
   const [cookingMealId, setCookingMealId] = useState<string | null>(null)
-  const [shoppingNote, setShoppingNote] = useState('')
+  const toast = useToast()
 
   const load = useCallback(async () => {
     setError('')
@@ -74,10 +75,10 @@ export function PlannerPage() {
             <ShortageList shortages={data.shortages} today={data.today} limit={showAllShortages ? undefined : 4} onSelectMeal={selectMeal} />
             <div className="panel-actions">
               <button className="secondary-button" onClick={async () => {
-                try { const { data } = await api.post<{ added: number }>(`/households/${household.id}/shopping/add-shortages`, {}); setShoppingNote(data.added ? `Added ${data.added} item${data.added === 1 ? '' : 's'} to your shopping list.` : 'Everything short is already on your shopping list.') }
-                catch (err) { setShoppingNote(errorMessage(err)) }
+                try { const { data } = await api.post<{ added: number }>(`/households/${household.id}/shopping/add-shortages`, {}); toast.success(data.added ? `Added ${data.added} item${data.added === 1 ? '' : 's'} to your shopping list.` : 'Everything short is already on your shopping list.') }
+                catch (err) { toast.error(errorMessage(err)) }
               }}><ShoppingCart size={15} aria-hidden />Add shortages to shopping list</button>
-              {shoppingNote && <span className="muted small">{shoppingNote} <Link to="/shopping">Open list</Link></span>}
+              <Link className="link-button" to="/shopping">Open shopping list</Link>
             </div>
           </section>
         : planned > 0 && <div className="callout success"><CalendarCheck size={18} aria-hidden /><span>Your pantry covers every upcoming planned meal.</span></div>}

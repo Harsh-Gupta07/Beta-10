@@ -4,6 +4,7 @@ import { BookOpen, Check, PackagePlus, SendHorizontal, ShoppingCart, Sparkles, X
 import { api, errorMessage, type AssistantAction, type AssistantReply, type RecipeDetail, type RecipeDraft } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { Badge, Notice, PageHeader } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { RecipeForm } from '../recipes/RecipeForm'
 
 type Message = { id: string; role: 'user' | 'assistant'; text: string; mode?: 'ai' | 'fallback'; actions?: AssistantAction[] }
@@ -23,6 +24,7 @@ export function AssistantPage() {
   const [actionNote, setActionNote] = useState<Record<string, string>>({})
   const [draft, setDraft] = useState<{ actionId: string; recipe: RecipeDraft } | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
+  const toast = useToast()
 
   useEffect(() => { api.get(`/households/${household.id}/assistant`).then(r => setStatus(r.data)).catch(() => setStatus({ configured: false, model: null })) }, [household.id])
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [messages, busy])
@@ -49,14 +51,17 @@ export function AssistantPage() {
         // The action id doubles as the idempotency key, so a double click can't add stock twice.
         await api.post(`/households/${household.id}/pantry/receive`, { ingredientId: action.ingredientId, quantity: action.quantity, unit: action.unit, note: 'Added via assistant', idempotencyKey: action.id })
         setActionNote(prev => ({ ...prev, [action.id]: 'Added to your pantry.' }))
+        toast.success(`${action.quantity} ${action.unit === 'l' ? 'L' : action.unit} ${action.ingredientName} added to your pantry.`)
       } else {
         for (const item of action.items) await api.post(`/households/${household.id}/shopping/items`, { ingredientId: item.ingredientId, quantity: item.quantity, unit: item.unit, source: 'ASSISTANT' })
         setActionNote(prev => ({ ...prev, [action.id]: 'Added to your shopping list.' }))
+        toast.success(`${action.items.length} item${action.items.length === 1 ? '' : 's'} added to your shopping list.`)
       }
       setActionState(prev => ({ ...prev, [action.id]: 'done' }))
     } catch (err) {
       setActionState(prev => ({ ...prev, [action.id]: 'pending' }))
       setActionNote(prev => ({ ...prev, [action.id]: errorMessage(err) }))
+      toast.error(errorMessage(err))
     }
   }
 

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { INPUT_UNITS } from '../services/units.js'
 import * as cooking from '../services/cooking.js'
+import { announce, describeMeal } from './activity.js'
 
 // Mounted under /households/:householdId, after requireUser + requireHouseholdMember.
 export const cookingRouter = Router({ mergeParams: true })
@@ -14,11 +15,17 @@ cookingRouter.get('/meals/:mealId/cooking', async (req, res) => {
 })
 
 cookingRouter.post('/meals/:mealId/start', async (req, res) => {
-  res.json(await cooking.startCooking(ctx(res).householdId, mealId(req.params)))
+  const result = await cooking.startCooking(ctx(res).householdId, mealId(req.params))
+  const about = await describeMeal(ctx(res).householdId, mealId(req.params))
+  if (about) await announce(res, `started cooking ${about.text}`, { link: about.link })
+  res.json(result)
 })
 
 cookingRouter.post('/meals/:mealId/stop', async (req, res) => {
-  res.json(await cooking.stopCooking(ctx(res).householdId, mealId(req.params)))
+  const result = await cooking.stopCooking(ctx(res).householdId, mealId(req.params))
+  const about = await describeMeal(ctx(res).householdId, mealId(req.params))
+  if (about) await announce(res, `paused cooking ${about.text}`, { link: about.link })
+  res.json(result)
 })
 
 cookingRouter.post('/meals/:mealId/complete', async (req, res) => {
@@ -33,5 +40,7 @@ cookingRouter.post('/meals/:mealId/complete', async (req, res) => {
   }).parse(req.body)
   const { householdId, userId } = ctx(res)
   const result = await cooking.completeMeal(householdId, userId, mealId(req.params), input)
+  const about = !result.alreadyCompleted && await describeMeal(householdId, mealId(req.params))
+  if (about) await announce(res, `cooked ${about.text}`, { body: ['Pantry stock was updated with what was used.', ...result.warnings].join(' '), link: about.link })
   res.status(result.alreadyCompleted ? 200 : 201).json(result)
 })

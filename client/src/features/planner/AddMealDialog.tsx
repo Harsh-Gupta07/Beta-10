@@ -4,12 +4,14 @@ import { api, errorMessage, type MealSlot, type RecipeSummary, type Suggestion, 
 import { useSession } from '../../lib/session'
 import { formatDay, slotLabel } from '../../lib/format'
 import { Modal, Notice } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { RecipePicker } from './RecipePicker'
 
 type Props = { date: string; slot: MealSlot; recipes: RecipeSummary[]; defaultServings: number; onClose: () => void; onAdded: () => void }
 
 export function AddMealDialog({ date, slot, recipes, defaultServings, onClose, onAdded }: Props) {
   const { household } = useSession()
+  const toast = useToast()
   const [recipe, setRecipe] = useState<RecipeSummary | null>(null)
   const [servings, setServings] = useState(defaultServings)
   const [busy, setBusy] = useState(false)
@@ -24,7 +26,7 @@ export function AddMealDialog({ date, slot, recipes, defaultServings, onClose, o
   async function save() {
     if (!recipe) return
     setBusy(true); setError('')
-    try { await api.post(`/households/${household.id}/meals`, { date, slot, recipeId: recipe.id, servings }); onAdded() }
+    try { await api.post(`/households/${household.id}/meals`, { date, slot, recipeId: recipe.id, servings }); toast.success(`${recipe.name} planned for ${slotLabel[slot].toLowerCase()} on ${formatDay(date)}. Its ingredients are reserved.`); onAdded() }
     catch (err) { setError(errorMessage(err, 'Could not plan this meal.')); setBusy(false) }
   }
 

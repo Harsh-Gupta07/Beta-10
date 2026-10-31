@@ -4,6 +4,7 @@ import { api, errorMessage, type Allergen, type DietType, type FoodPreferences, 
 import { useSession } from '../../lib/session'
 import { ALLERGENS, ALLERGEN_LABEL, DIET_HINT, DIET_LABEL, DIET_TYPES, SPICE_LABEL } from '../../lib/food'
 import { Badge, Field, Notice, PageHeader, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { FamilyManager } from '../onboarding/FamilyManager'
 
 type Option = { id: string; name: string }
@@ -17,7 +18,7 @@ export function FoodPreferencesPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [recipes, setRecipes] = useState<RecipeSummary[]>([])
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
 
   const load = useCallback(async () => {
     setError('')
@@ -35,15 +36,14 @@ export function FoodPreferencesPage() {
   useEffect(() => { void load() }, [load])
 
   async function save(request: () => Promise<unknown>, success: string) {
-    setError(''); setNotice('')
-    try { await request(); await load(); setNotice(success) }
-    catch (err) { setError(errorMessage(err)) }
+    setError('')
+    try { await request(); await load(); toast.success(success) }
+    catch (err) { toast.error(errorMessage(err)) }
   }
 
   return <>
     <PageHeader eyebrow="FOOD PREFERENCES" title="What everyone eats" description="Allergies and diets are firm rules: dishes that clash are marked on every recipe. Likes and dislikes only guide suggestions." />
     {error && <Notice onRetry={load}>{error}</Notice>}
-    {notice && <Notice tone="success">{notice}</Notice>}
     {!mine && !error && <Spinner label="Loading preferences…" />}
 
     {mine && shared && <div className="settings-grid">

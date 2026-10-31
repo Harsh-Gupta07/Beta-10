@@ -13,7 +13,7 @@ import { shoppingRouter } from './shopping.js'
 import { assistantRouter } from './assistant.js'
 import { suggestionsRouter } from './suggestions.js'
 import * as households from '../services/household.js'
-import { listNotifications, markAllRead } from '../services/notifications.js'
+import { listNotifications, markAllRead, unreadCount } from '../services/notifications.js'
 import { getVerificationQueue } from '../services/verification.js'
 import * as foodPreferences from '../services/foodPreferences.js'
 import { getKitchenRoles, KITCHEN_ROLES, setKitchenRoles } from '../services/kitchenRoles.js'
@@ -21,6 +21,7 @@ import { AGE_GROUPS, ALLERGENS, DIET_TYPES, HEALTH_GOALS, WEEKDAYS } from '../se
 import type { HouseholdRole } from '@prisma/client'
 import { env } from '../config/env.js'
 import { rateLimit } from '../lib/rateLimit.js'
+import { announce } from './activity.js'
 
 export const householdRouter = Router()
 householdRouter.use(requireUser)
@@ -31,7 +32,9 @@ const joinLimit = rateLimit({ windowMs: 15 * 60_000, max: env.RATE_LIMIT_JOIN, k
 // Must be registered before the '/:householdId' middleware, which would treat "join" as an id.
 householdRouter.post('/join', joinLimit, async (req, res) => {
   const { code } = z.object({ code: z.string().trim().min(4).max(20) }).parse(req.body)
-  res.status(201).json(await households.joinHousehold((res.locals.user as { id: string }).id, code))
+  const household = await households.joinHousehold((res.locals.user as { id: string }).id, code)
+  await announce(res, 'joined the household', { body: 'Say hello and give them a role in Settings.', link: '/settings' }, household.id)
+  res.status(201).json(household)
 })
 
 householdRouter.use('/:householdId', requireHouseholdMember, pantryRouter, recipeRouter, plannerRouter, cookingRouter, shoppingRouter, assistantRouter, suggestionsRouter)
@@ -50,29 +53,38 @@ householdRouter.patch('/:householdId', requireHouseholdMember, async (req, res) 
     katoriMl: z.coerce.number().int().min(50).max(500).nullable().optional(),
     chammachMl: z.coerce.number().int().min(2).max(30).nullable().optional(),
     mutthiGrams: z.coerce.number().int().min(10).max(150).nullable().optional() }).parse(req.body)
-  res.json(await households.updateHousehold(hid(res), role(res), input))
+  const updated = await households.updateHousehold(hid(res), role(res), input)
+  const LABEL: Record<string, string> = { name: 'name', defaultServings: 'usual servings', timezone: 'timezone', appliances: 'appliances', usualCookMinutes: 'usual cooking time', katoriMl: 'katori size', chammachMl: 'chammach size', mutthiGrams: 'mutthi size' }
+  const changed = Object.keys(input).filter(key => input[key as keyof typeof input] !== undefined).map(key => LABEL[key] ?? key)
+  if (changed.length) await announce(res, 'updated the household settings', { body: `Changed: ${changed.join(', ')}.`, link: '/settings' })
+  res.json(updated)
 })
 
 householdRouter.post('/:householdId/invite-code', requireHouseholdMember, async (_req, res) => {
-  res.json({ inviteCode: await households.createInviteCode(hid(res), role(res)) })
+  const inviteCode = await households.createInviteCode(hid(res), role(res))
+  await announce(res, 'made a new invite code', { body: 'Older codes no longer work.', link: '/settings' })
+  res.json({ inviteCode })
 })
 
 householdRouter.delete('/:householdId/invite-code', requireHouseholdMember, async (_req, res) => {
   await households.disableInvites(hid(res), role(res))
+  await announce(res, 'switched off invite codes', { link: '/settings' })
   res.status(204).end()
 })
 
 householdRouter.delete('/:householdId/members/:userId', requireHouseholdMember, async (req, res) => {
+  const removed = await prisma.user.findUnique({ where: { id: String(req.params.userId) }, select: { name: true } })
   await households.removeMember(hid(res), role(res), (res.locals.user as { id: string }).id, String(req.params.userId))
+  if (removed) await announce(res, `removed ${removed.name} from the household`, { link: '/settings' })
   res.status(204).end()
 })
 
 householdRouter.get('/:householdId/notifications', requireHouseholdMember, async (_req, res) => {
-  res.json(await listNotifications(hid(res)))
+  res.json(await listNotifications(hid(res), (res.locals.user as { id: string }).id))
 })
 
 householdRouter.post('/:householdId/notifications/read', requireHouseholdMember, async (_req, res) => {
-  await markAllRead(hid(res))
+  await markAllRead(hid(res), (res.locals.user as { id: string }).id)
   res.status(204).end()
 })
 
@@ -95,15 +107,21 @@ householdRouter.get('/:householdId/family', requireHouseholdMember, async (_req,
 })
 
 householdRouter.post('/:householdId/family', requireHouseholdMember, async (req, res) => {
-  res.status(201).json(await foodPreferences.addFamilyProfile(hid(res), familyInput.parse(req.body)))
+  const profile = await foodPreferences.addFamilyProfile(hid(res), familyInput.parse(req.body))
+  await announce(res, `added ${profile.name} to the people who eat at home`, { body: 'Their diet and allergies now count in every safety check.', link: '/preferences' })
+  res.status(201).json(profile)
 })
 
 householdRouter.put('/:householdId/family/:profileId', requireHouseholdMember, async (req, res) => {
-  res.json(await foodPreferences.updateFamilyProfile(hid(res), String(req.params.profileId), familyInput.parse(req.body)))
+  const profile = await foodPreferences.updateFamilyProfile(hid(res), String(req.params.profileId), familyInput.parse(req.body))
+  await announce(res, `updated ${profile.name}’s food needs`, { body: 'Recipe safety labels and suggestions now use the new details.', link: '/preferences' })
+  res.json(profile)
 })
 
 householdRouter.delete('/:householdId/family/:profileId', requireHouseholdMember, async (req, res) => {
+  const profile = await prisma.familyProfile.findFirst({ where: { id: String(req.params.profileId), householdId: hid(res) }, select: { name: true } })
   await foodPreferences.deleteFamilyProfile(hid(res), String(req.params.profileId))
+  if (profile) await announce(res, `removed ${profile.name} from the people who eat at home`, { link: '/preferences' })
   res.status(204).end()
 })
 
@@ -117,13 +135,17 @@ householdRouter.put('/:householdId/roles', requireHouseholdMember, async (req, r
     members: z.array(z.object({ userId: z.string().min(1).max(40), roles: rolesList })).max(50).default([]),
     family: z.array(z.object({ id: z.string().min(1).max(40), roles: rolesList })).max(20).default([]),
   }).parse(req.body)
-  res.json(await setKitchenRoles(hid(res), (res.locals.user as { id: string }).id, role(res), input))
+  const roles = await setKitchenRoles(hid(res), (res.locals.user as { id: string }).id, role(res), input)
+  await announce(res, 'updated who does what in the kitchen', { body: 'Check “Today for you” on the dashboard for your jobs.', link: '/' })
+  res.json(roles)
 })
 
 /** The owner finishes the onboarding cards; from then on the app opens on the dashboard. */
 householdRouter.post('/:householdId/onboarding/complete', requireHouseholdMember, async (_req, res) => {
   if (role(res) !== 'OWNER') return res.status(403).json({ error: 'Only the household owner can finish setup.' })
-  res.json(await prisma.household.update({ where: { id: hid(res) }, data: { onboardingCompletedAt: new Date() }, select: { id: true, onboardingCompletedAt: true } }))
+  const household = await prisma.household.update({ where: { id: hid(res) }, data: { onboardingCompletedAt: new Date() }, select: { id: true, onboardingCompletedAt: true } })
+  await announce(res, 'finished setting up the kitchen', { link: '/' })
+  res.json(household)
 })
 
 householdRouter.get('/:householdId/food-profile', requireHouseholdMember, async (_req, res) => {
@@ -132,7 +154,9 @@ householdRouter.get('/:householdId/food-profile', requireHouseholdMember, async 
 
 householdRouter.put('/:householdId/food-profile', requireHouseholdMember, async (req, res) => {
   const input = z.object({ cuisines: z.array(z.string().trim().min(1).max(40)).max(20).default([]), usualSpice: z.coerce.number().int().min(1).max(5).nullable().default(null) }).parse(req.body)
-  res.json(await foodPreferences.updateHouseholdFoodProfile(hid(res), role(res), input))
+  const profile = await foodPreferences.updateHouseholdFoodProfile(hid(res), role(res), input)
+  await announce(res, 'updated the household’s usual cuisines and spice level', { link: '/preferences' })
+  res.json(profile)
 })
 
 householdRouter.post('/', async (req, res, next) => {
@@ -159,7 +183,7 @@ householdRouter.get('/:householdId/dashboard', requireHouseholdMember, async (_r
     ])
     const lowStock = pantry.filter(item => item.status !== 'OK').slice(0, 5)
     const needsCheck = pantry.filter(item => item.confidence === 'CHECK_NEEDED' || item.expiry === 'EXPIRED').length
-    const unreadNotifications = await prisma.notification.count({ where: { householdId, readAt: null } })
+    const unreadNotifications = await unreadCount(householdId, (res.locals.user as { id: string }).id)
     res.json({ household, today: plan.today, unreadNotifications, pantryCount: pantry.length, lowStock, lowStockCount: pantry.filter(item => item.status !== 'OK').length, needsCheck, recipeCount, todayMeals: plan.todayMeals, upcomingMeals: plan.upcomingMeals, shortages: plan.shortages, shoppingCount, activity })
   } catch (error) { next(error) }
 })

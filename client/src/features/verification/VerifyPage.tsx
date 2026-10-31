@@ -5,6 +5,7 @@ import { api, errorMessage, type InputUnit, type Shortage, type VerificationEntr
 import { useSession } from '../../lib/session'
 import { baseUnit, formatQuantity, slotLabel, unitOptions } from '../../lib/format'
 import { Badge, EmptyState, Notice, PageHeader, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { StockBadges } from '../pantry/StockBadges'
 
 type Outcome = { tone: 'success' | 'warning'; text: string; link?: string }
@@ -15,6 +16,7 @@ export function VerifyPage() {
   const [queue, setQueue] = useState<VerificationEntry[] | null>(null)
   const [error, setError] = useState('')
   const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({})
+  const toast = useToast()
 
   const load = useCallback(async () => {
     setError('')
@@ -28,6 +30,8 @@ export function VerifyPage() {
     try {
       const { data } = await api.post<{ changed: boolean; previousQuantity: string; item: VerificationEntry['item']; affected: Shortage | null }>(`/households/${household.id}/pantry/${entry.item.id}/verify`, body)
       const text = data.changed ? `${name} updated from ${formatQuantity(data.previousQuantity, data.item.unit)} to ${formatQuantity(data.item.quantity, data.item.unit)}.` : `${name} confirmed at ${formatQuantity(data.item.quantity, data.item.unit)}.`
+      if (data.affected) toast.info(`${text} Some planned meals are now short; see the shopping list.`)
+      else toast.success(text)
       setOutcomes(prev => ({ ...prev, [entry.item.id]: data.affected
         ? { tone: 'warning', text: `${text} Planned meals are now short ${formatQuantity(data.affected.shortage, data.affected.unit)}, starting with ${data.affected.firstAffected.recipeName} (${slotLabel[data.affected.firstAffected.slot].toLowerCase()}, ${data.affected.firstAffected.date}).`, link: '/shopping' }
         : { tone: 'success', text: `${text} Plans and shortages are up to date.` } }))

@@ -226,7 +226,8 @@ export type ShoppingData = { today: string; items: ShoppingItem[]; suggestions: 
 
 export type VerificationEntry = { item: PantryItem; reasons: string[]; score: number; neededBy: number; priority: 'HIGH' | 'MEDIUM' | 'LOW' }
 
-export type AppNotification = { id: string; title: string; body: string; link: string | null; readAt: string | null; createdAt: string }
+/** `read` is per person: each member has their own unread count. */
+export type AppNotification = { id: string; title: string; body: string; link: string | null; read: boolean; createdAt: string }
 
 export type HouseholdDetails = Household & {
   timezone: string; inviteCode: string | null; createdAt: string; yourRole: 'OWNER' | 'MEMBER'

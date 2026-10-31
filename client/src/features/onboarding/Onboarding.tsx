@@ -4,6 +4,7 @@ import { api, errorMessage, type FamilyProfile, type FoodPreferences, type House
 import { AGE_GROUP_LABEL, DIET_LABEL } from '../../lib/food'
 import { Brand } from '../../components/AppShell'
 import { Badge, Notice, Segmented, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { PersonFields, emptyNeeds } from './PersonFields'
 import { KitchenFields, type KitchenSetup } from './KitchenFields'
 import { RolesEditor } from './RolesEditor'
@@ -20,8 +21,10 @@ const STAGES = ['people', 'kitchen', 'roles', 'language', 'pantry'] as const
 export function Onboarding({ user, household, onChanged, onSignOut }: Props) {
   const [stage, setStage] = useState<(typeof STAGES)[number]>('people')
   const step = !household ? 1 : STAGES.indexOf(stage) + 2
+  const toast = useToast()
   async function finish() {
     await api.post(`/households/${household!.id}/onboarding/complete`)
+    toast.success('Setup complete. Welcome to your kitchen!')
     await onChanged()
   }
   return <main className="onboarding">
@@ -44,6 +47,7 @@ export function Onboarding({ user, household, onChanged, onSignOut }: Props) {
 }
 
 function HouseholdStep({ user, onCreated }: { user: User; onCreated: () => Promise<void> }) {
+  const toast = useToast()
   const [mode, setMode] = useState<'create' | 'join'>('create')
   const [people, setPeople] = useState(3)
   const [message, setMessage] = useState('')
@@ -53,7 +57,8 @@ function HouseholdStep({ user, onCreated }: { user: User; onCreated: () => Promi
     event.preventDefault(); setMessage(''); setBusy(true)
     const fields = Object.fromEntries(new FormData(event.currentTarget))
     try {
-      await api.post(mode === 'create' ? '/households' : '/households/join', mode === 'create' ? { name: fields.name, peopleCount: people, defaultServings: Math.min(20, people) } : fields)
+      const { data } = await api.post<{ name: string }>(mode === 'create' ? '/households' : '/households/join', mode === 'create' ? { name: fields.name, peopleCount: people, defaultServings: Math.min(20, people) } : fields)
+      toast.success(mode === 'create' ? `${data.name} is ready. Let’s set it up.` : `You joined ${data.name}. Everyone there can now see your changes.`)
       await onCreated()
     } catch (err) { setMessage(errorMessage(err, mode === 'create' ? 'Could not create your household.' : 'Could not join that household.')) }
     finally { setBusy(false) }
@@ -85,6 +90,7 @@ function HouseholdStep({ user, onCreated }: { user: User; onCreated: () => Promi
 }
 
 function KitchenStep({ household, onBack, onNext }: { household: Household; onBack: () => void; onNext: () => void }) {
+  const toast = useToast()
   const [setup, setSetup] = useState<KitchenSetup>({ appliances: household.appliances ?? [], usualCookMinutes: household.usualCookMinutes ?? null, cuisines: [], defaultServings: household.defaultServings })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -95,6 +101,7 @@ function KitchenStep({ household, onBack, onNext }: { household: Household; onBa
       if (save) {
         await api.patch(`/households/${household.id}`, { appliances: setup.appliances, usualCookMinutes: setup.usualCookMinutes, defaultServings: setup.defaultServings })
         if (setup.cuisines.length) await api.put(`/households/${household.id}/food-profile`, { cuisines: setup.cuisines })
+        toast.success('Kitchen details saved.')
       }
       onNext()
     } catch (err) { setError(errorMessage(err, 'Could not save your kitchen.')); setBusy(false) }
@@ -116,11 +123,12 @@ function KitchenStep({ household, onBack, onNext }: { household: Household; onBa
 }
 
 function RolesStep({ user, household, onBack, onNext }: { user: User; household: Household; onBack: () => void; onNext: () => void }) {
+  const toast = useToast()
   return <section className="onboarding-card wide">
     <p className="eyebrow">STEP 4</p>
     <h1>Who does what in your kitchen?</h1>
     <p className="muted">Each person then sees their own jobs first: the cook sees today’s meals, the shopper the list, the checker the stock check. Everyone can still use everything.</p>
-    <RolesEditor householdId={household.id} userId={user.id} owner saveLabel="Save and continue" onSaved={onNext} />
+    <RolesEditor householdId={household.id} userId={user.id} owner saveLabel="Save and continue" onSaved={message => { toast.success(message); onNext() }} />
     <div className="onboarding-actions">
       <button type="button" className="ghost-button" onClick={onBack}>Back</button>
       <span className="toolbar-spacer" />
@@ -130,6 +138,7 @@ function RolesStep({ user, household, onBack, onNext }: { user: User; household:
 }
 
 function LanguageStep({ user, household, onBack, onNext }: { user: User; household: Household; onBack: () => void; onNext: () => void }) {
+  const toast = useToast()
   const [setup, setSetup] = useState<LanguageSetup>({
     language: user.language ?? "EN", voiceLanguage: user.voiceLanguage ?? "en-IN",
     katoriMl: household.katoriMl ?? DEFAULT_MEASURES.katoriMl, chammachMl: household.chammachMl ?? DEFAULT_MEASURES.chammachMl, mutthiGrams: household.mutthiGrams ?? DEFAULT_MEASURES.mutthiGrams,
@@ -142,6 +151,7 @@ function LanguageStep({ user, household, onBack, onNext }: { user: User; househo
       if (save) {
         await api.patch("/auth/me", { language: setup.language, voiceLanguage: setup.voiceLanguage })
         await api.patch(`/households/${household.id}`, { katoriMl: setup.katoriMl, chammachMl: setup.chammachMl, mutthiGrams: setup.mutthiGrams })
+        toast.success('Language and household measures saved.')
       }
       onNext()
     } catch (err) { setError(errorMessage(err, "Could not save your language and measures.")); setBusy(false) }
@@ -162,6 +172,7 @@ function LanguageStep({ user, household, onBack, onNext }: { user: User; househo
 }
 
 function PeopleStep({ user, household, onNext }: { user: User; household: Household; onNext: () => void }) {
+  const toast = useToast()
   const [mine, setMine] = useState<FoodPreferences | null>(null)
   const [me, setMe] = useState<PersonNeeds>(emptyNeeds)
   const [family, setFamily] = useState<FamilyProfile[]>([])
@@ -179,9 +190,9 @@ function PeopleStep({ user, household, onNext }: { user: User; household: Househ
   }, [household.id])
   useEffect(() => { void load() }, [load])
 
-  async function run(request: () => Promise<unknown>) {
+  async function run(request: () => Promise<unknown>, success: string) {
     setBusy(true); setError('')
-    try { await request(); await load(); setEditing(null) }
+    try { await request(); await load(); setEditing(null); toast.success(success) }
     catch (err) { setError(errorMessage(err)) }
     finally { setBusy(false) }
   }
@@ -190,10 +201,10 @@ function PeopleStep({ user, household, onNext }: { user: User; household: Househ
     ...me, maxSpice: mine!.maxSpice, cuisines: mine!.cuisines,
     avoidIngredientIds: mine!.avoidIngredients.map(i => i.id), likedIngredientIds: mine!.likedIngredients.map(i => i.id),
     favouriteRecipeIds: mine!.favouriteRecipes.map(r => r.id), dislikedRecipeIds: mine!.dislikedRecipes.map(r => r.id),
-  }))
+  }), 'Your food needs are saved.')
   const saveFamily = (id: string | null) => run(() => id
     ? api.put(`/households/${household.id}/family/${id}`, { name: draft.name, ...draft.needs })
-    : api.post(`/households/${household.id}/family`, { name: draft.name, ...draft.needs }))
+    : api.post(`/households/${household.id}/family`, { name: draft.name, ...draft.needs }), `Saved ${draft.name.trim()}.`)
   const startFamily = (person?: FamilyProfile) => {
     setDraft(person ? { name: person.name, needs: { ageGroup: person.ageGroup, dietType: person.dietType, allergens: person.allergens, healthGoals: person.healthGoals, weeklyFasts: person.weeklyFasts } } : { name: '', needs: emptyNeeds })
     setEditing(person ? person.id : 'new')
@@ -218,7 +229,7 @@ function PeopleStep({ user, household, onNext }: { user: User; household: Househ
       </li>
       {family.map(person => <li key={person.id} className={editing === person.id ? 'open' : ''}>
         <PersonRow icon={<Users size={18} aria-hidden />} name={person.name} needs={person} onEdit={() => startFamily(person)} editing={editing === person.id}
-          onRemove={() => window.confirm(`Remove ${person.name}?`) && run(() => api.delete(`/households/${household.id}/family/${person.id}`))} />
+          onRemove={() => window.confirm(`Remove ${person.name}?`) && run(() => api.delete(`/households/${household.id}/family/${person.id}`), `Removed ${person.name}.`)} />
         {editing === person.id && <FamilyEditor draft={draft} setDraft={setDraft} busy={busy} onSave={() => saveFamily(person.id)} onCancel={() => setEditing(null)} />}
       </li>)}
       {editing === 'new' && <li className="open"><FamilyEditor draft={draft} setDraft={setDraft} busy={busy} onSave={() => saveFamily(null)} onCancel={() => setEditing(null)} /></li>}

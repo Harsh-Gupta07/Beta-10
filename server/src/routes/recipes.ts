@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { INPUT_UNITS } from '../services/units.js'
 import * as recipes from '../services/recipes.js'
+import { prisma } from '../lib/prisma.js'
+import { announce } from './activity.js'
 
 // Mounted under /households/:householdId, after requireUser + requireHouseholdMember.
 export const recipeRouter = Router({ mergeParams: true })
@@ -41,18 +43,26 @@ recipeRouter.get('/recipes/:recipeId', async (req, res) => {
 })
 
 recipeRouter.post('/recipes', async (req, res) => {
-  res.status(201).json(await recipes.createRecipe(householdId(res), recipeInput.parse(req.body)))
+  const recipe = await recipes.createRecipe(householdId(res), recipeInput.parse(req.body))
+  await announce(res, `added the recipe ${recipe.name}`, { link: `/recipes/${recipe.id}` })
+  res.status(201).json(recipe)
 })
 
 recipeRouter.put('/recipes/:recipeId', async (req, res) => {
-  res.json(await recipes.updateRecipe(householdId(res), recipeId(req.params), recipeInput.parse(req.body)))
+  const recipe = await recipes.updateRecipe(householdId(res), recipeId(req.params), recipeInput.parse(req.body))
+  await announce(res, `edited the recipe ${recipe.name}`, { link: `/recipes/${recipe.id}` })
+  res.json(recipe)
 })
 
 recipeRouter.delete('/recipes/:recipeId', async (req, res) => {
+  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId(req.params), householdId: householdId(res) }, select: { name: true } })
   await recipes.deleteRecipe(householdId(res), recipeId(req.params))
+  if (recipe) await announce(res, `removed the recipe ${recipe.name}`, { body: 'Meals already cooked or eaten keep their history.', link: '/recipes' })
   res.status(204).end()
 })
 
 recipeRouter.post('/recipes/:recipeId/duplicate', async (req, res) => {
-  res.status(201).json(await recipes.duplicateRecipe(householdId(res), recipeId(req.params)))
+  const recipe = await recipes.duplicateRecipe(householdId(res), recipeId(req.params))
+  await announce(res, `made an editable copy of ${recipe.name}`, { link: `/recipes/${recipe.id}` })
+  res.status(201).json(recipe)
 })

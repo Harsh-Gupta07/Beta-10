@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { requireUser } from '../middleware/auth.js'
 import { AGE_GROUPS, ALLERGENS, DIET_TYPES, HEALTH_GOALS, WEEKDAYS } from '../services/foodSafety.js'
 import * as preferences from '../services/foodPreferences.js'
+import { prisma } from '../lib/prisma.js'
+import { announce } from './activity.js'
 
 // Things that belong to the signed-in person rather than to their household.
 export const meRouter = Router()
@@ -30,7 +32,11 @@ meRouter.get('/food-preferences', async (_req, res) => {
 })
 
 meRouter.put('/food-preferences', async (req, res) => {
-  res.json(await preferences.updateMyPreferences(userId(res), preferencesInput.parse(req.body)))
+  const result = await preferences.updateMyPreferences(userId(res), preferencesInput.parse(req.body))
+  // Diet and allergies change what is safe for the whole household, so everyone hears about it.
+  const membership = await prisma.householdMember.findFirst({ where: { userId: userId(res) }, select: { householdId: true } })
+  if (membership) await announce(res, 'updated their diet, allergies and food likes', { body: 'Recipe safety labels and suggestions now use the new details.', link: '/preferences' }, membership.householdId)
+  res.json(result)
 })
 
 // One dish at a time, for "Love it" and "Don't suggest for me". kind null clears it.

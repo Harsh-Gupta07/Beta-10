@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage, type Attendance } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { Notice } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 
 /** Tick who is (or was) eating a meal. Everyone counts unless unticked; this feeds "recently eaten" and suggestions. */
 export function WhoIsEating({ kind, id, onSaved }: { kind: 'meal' | 'log'; id: string; onSaved?: () => void }) {
@@ -10,6 +11,7 @@ export function WhoIsEating({ kind, id, onSaved }: { kind: 'meal' | 'log'; id: s
   const [data, setData] = useState<Attendance | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const toast = useToast()
 
   const load = useCallback(async () => {
     try { setData((await api.get<Attendance>(path)).data) }
@@ -21,7 +23,12 @@ export function WhoIsEating({ kind, id, onSaved }: { kind: 'meal' | 'log'; id: s
     if (!data) return
     const absent = data.members.filter(m => m.id === userId ? m.eating : !m.eating).map(m => m.id)
     setBusy(true); setError('')
-    try { setData((await api.put<Attendance>(path, { absentUserIds: absent })).data); onSaved?.() }
+    const person = data.members.find(m => m.id === userId)!
+    try {
+      setData((await api.put<Attendance>(path, { absentUserIds: absent })).data)
+      toast.success(person.eating ? `${person.name} is marked as not eating this meal.` : `${person.name} is marked as eating this meal.`)
+      onSaved?.()
+    }
     catch (err) { setError(errorMessage(err)) }
     finally { setBusy(false) }
   }

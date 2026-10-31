@@ -4,6 +4,7 @@ import { api, errorMessage, type InputUnit, type PantryItem, type StockTransacti
 import { useSession } from '../../lib/session'
 import { baseUnit, formatDate, formatDelta, formatQuantity, relativeTime, transactionLabel, unitOptions } from '../../lib/format'
 import { Modal, Notice, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { StockBadges } from './StockBadges'
 
 type Props = { item: PantryItem; onClose: () => void; onChanged: (item: PantryItem) => void; onDeleted: (id: string) => void; onEdit: () => void }
@@ -23,18 +24,18 @@ export function PantryItemSheet({ item, onClose, onChanged, onDeleted, onEdit }:
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const toast = useToast()
 
   const loadHistory = useCallback(() => {
     api.get<StockTransaction[]>(`${path}/transactions`).then(r => setHistory(r.data)).catch(err => { setHistory([]); setError(errorMessage(err, 'Could not load stock history.')) })
   }, [path])
   useEffect(loadHistory, [loadHistory])
 
-  function openMode(next: typeof mode) { setMode(next); setQuantity(''); setNote(''); setUnit(baseUnit[item.unit]); setError(''); setSuccess('') }
+  function openMode(next: typeof mode) { setMode(next); setQuantity(''); setNote(''); setUnit(baseUnit[item.unit]); setError('') }
 
   async function run(action: () => Promise<string>) {
-    setBusy(true); setError(''); setSuccess('')
-    try { setSuccess(await action()); setMode('idle'); loadHistory() }
+    setBusy(true); setError('')
+    try { toast.success(await action()); setMode('idle'); loadHistory() }
     catch (err) { setError(errorMessage(err)) }
     finally { setBusy(false) }
   }
@@ -42,7 +43,9 @@ export function PantryItemSheet({ item, onClose, onChanged, onDeleted, onEdit }:
   const verify = (body: object) => run(async () => {
     const { data } = await api.post<{ item: PantryItem; changed: boolean; previousQuantity: string }>(`${path}/verify`, body)
     onChanged(data.item)
-    return data.changed ? `Corrected from ${formatQuantity(data.previousQuantity, item.unit)} to ${formatQuantity(data.item.quantity, item.unit)}.` : 'Marked as confirmed.'
+    const name = item.ingredient.name
+    if ((body as { action: string }).action === 'finished') return `${name} marked as finished. Planned meals that need it now show a shortage.`
+    return data.changed ? `${name} corrected from ${formatQuantity(data.previousQuantity, item.unit)} to ${formatQuantity(data.item.quantity, item.unit)}. Plans and shortages are updated.` : `${name} confirmed at ${formatQuantity(data.item.quantity, item.unit)}.`
   })
 
   function submitUpdate(event: FormEvent) { event.preventDefault(); void verify({ action: 'update', quantity, unit, note: note || undefined }) }
@@ -51,12 +54,12 @@ export function PantryItemSheet({ item, onClose, onChanged, onDeleted, onEdit }:
     void run(async () => {
       const { data } = await api.post<PantryItem>(`${path}/use`, { quantity, unit, note: note || undefined })
       onChanged(data)
-      return `Recorded. ${formatQuantity(data.quantity, data.unit)} left.`
+      return `Recorded use of ${item.ingredient.name}. ${formatQuantity(data.quantity, data.unit)} left.`
     })
   }
   async function remove() {
     setBusy(true); setError('')
-    try { await api.delete(path); onDeleted(item.id) }
+    try { await api.delete(path); toast.success(`${item.ingredient.name} removed from your pantry. Its stock history is kept.`); onDeleted(item.id) }
     catch (err) { setError(errorMessage(err)); setBusy(false) }
   }
 
@@ -76,7 +79,6 @@ export function PantryItemSheet({ item, onClose, onChanged, onDeleted, onEdit }:
     </div>
 
     {error && <Notice>{error}</Notice>}
-    {success && <Notice tone="success">{success}</Notice>}
 
     <section className="sheet-section">
       <h3>Is {formatQuantity(item.quantity, item.unit)} still right?</h3>

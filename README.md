@@ -213,7 +213,9 @@ The **Dashboard** is your daily overview:
 - **recent activity** (stock added, used, cooked, corrected)
 - quick actions: Add ingredient, Verify stock, Plan a meal, Add recipe, Shopping list, Ask the assistant
 
-The **bell** 🔔 (next to your household name, or in the mobile top bar) shows notifications, for example when recorded usage or a stock correction leaves a planned meal short. Click one to jump to the affected week.
+**Alerts for every change.** Whenever you save, add, remove, plan, cook or check something, a short confirmation appears at the bottom of the screen (errors stay longer, in red).
+
+The **bell** 🔔 (next to your household name, or in the mobile top bar) tells you what *the rest of your household* changed: "Ravi planned Dal Tadka for dinner on Tue, 3 Nov", "Asha received Milk", "Ravi updated their diet and allergies". It also warns everyone when recorded usage or a stock correction leaves a planned meal short. Each person has their own unread count, you never get alerts about your own changes, and new members only see what happened after they joined. While the app is open the bell checks for news every 45 seconds and shows anything new as a pop-up. Click a notification to jump to the affected page.
 
 ### 11. Food preferences and allergies
 

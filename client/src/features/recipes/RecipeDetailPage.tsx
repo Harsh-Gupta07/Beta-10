@@ -5,6 +5,7 @@ import { api, errorMessage, type RecipeDetail } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatQuantity } from '../../lib/format'
 import { Badge, Modal, Notice, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { RecipeForm } from './RecipeForm'
 import { RecipePhoto } from './RecipePhoto'
 import { DietBadge, SafetyPanel } from './RecipeSafety'
@@ -33,6 +34,7 @@ export function RecipeDetailPage() {
   }, [path, servings])
   useEffect(() => { void load() }, [load])
 
+  const toast = useToast()
   async function startEdit() {
     setActionError('')
     try { setEditing((await api.get<RecipeDetail>(path, { params: { servings: recipe!.baseServings } })).data) }
@@ -40,13 +42,13 @@ export function RecipeDetailPage() {
   }
   async function duplicate() {
     setBusy(true); setActionError('')
-    try { const { data } = await api.post<RecipeDetail>(`${path}/duplicate`); setServings(null); navigate(`/recipes/${data.id}`) }
+    try { const { data } = await api.post<RecipeDetail>(`${path}/duplicate`); setServings(null); toast.success(`Made your own copy of ${data.name}. Edit it however you like.`); navigate(`/recipes/${data.id}`) }
     catch (err) { setActionError(errorMessage(err)) }
     finally { setBusy(false) }
   }
   async function remove() {
     setBusy(true); setActionError('')
-    try { await api.delete(path); navigate('/recipes') }
+    try { await api.delete(path); toast.success(`${recipe!.name} removed from your recipes. Meals already cooked or eaten keep it in their history.`); navigate('/recipes') }
     catch (err) { setActionError(errorMessage(err)); setBusy(false); setConfirmDelete(false) }
   }
 

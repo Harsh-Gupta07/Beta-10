@@ -172,6 +172,7 @@ model User {
   eatenLogs     EatenLog[]
   absences      MealAbsence[]
   snoozes       RecommendationSnooze[]
+  notifications Notification[]
 }
 
 model Household {
@@ -561,8 +562,12 @@ model Notification {
   body        String
   /// In-app path the notification points to, e.g. /planner?week=2026-11-02
   link        String?
-  readAt      DateTime?
+  /// Who made the change. They already saw it on screen, so it isn't shown to them; null for system alerts.
+  actorUserId String?
+  /// Members who have opened the bell since this arrived. Each person has their own unread count.
+  readBy      String[]  @default([])
   createdAt   DateTime  @default(now())
   household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  @@index([householdId, readAt, createdAt])
+  actor       User?     @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  @@index([householdId, createdAt])
 }

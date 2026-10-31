@@ -4,6 +4,7 @@ import { api, errorMessage, type FoodPreferences, type HistoryData, type MealSlo
 import { useSession } from '../../lib/session'
 import { addDays, formatDay, relativeDay, slotLabel, slots } from '../../lib/format'
 import { Badge, EmptyState, Field, Notice, PageHeader, Segmented, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { SuggestionCard, type MyDishPrefs } from './SuggestionCard'
 import { WhoIsEating } from './WhoIsEating'
 
@@ -17,7 +18,7 @@ export function SuggestionsPage() {
   const [history, setHistory] = useState<HistoryData | null>(null)
   const [prefs, setPrefs] = useState<MyDishPrefs | undefined>()
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
 
   const load = useCallback(async () => {
     setError('')
@@ -34,12 +35,11 @@ export function SuggestionsPage() {
   useEffect(() => { void load() }, [load])
 
   // Refresh first, so the confirmation never appears next to a stale list.
-  const changed = async (message: string) => { setNotice(''); await load(); setNotice(message) }
+  const changed = async (message: string) => { await load(); toast.success(message) }
 
   return <>
     <PageHeader eyebrow="WHAT TO COOK" title="Ideas for your next meal" description="Ranked from your pantry, what you’ve eaten lately and what people like. Dishes that clash with anyone’s allergies or diet are never suggested." />
     {error && <Notice onRetry={load}>{error}</Notice>}
-    {notice && <Notice tone="success">{notice}</Notice>}
 
     <section className="toolbar">
       <Segmented label="Cooking for" value={scope} onChange={setScope} options={[{ value: 'household', label: 'Everyone' }, { value: 'me', label: 'Just me' }]} />
@@ -67,13 +67,14 @@ export function SuggestionsPage() {
           </li>)}</ul>
         </section>}
       </section>
-      {history && <RecentlyEaten history={history} today={data.today} onChanged={changed} />}
+      {history && <RecentlyEaten history={history} today={data.today} onChanged={changed} onReload={load} />}
     </div>}
   </>
 }
 
-function RecentlyEaten({ history, today, onChanged }: { history: HistoryData; today: string; onChanged: (message: string) => void }) {
+function RecentlyEaten({ history, today, onChanged, onReload }: { history: HistoryData; today: string; onChanged: (message: string) => void; onReload: () => Promise<void> }) {
   const { household } = useSession()
+  const toast = useToast()
   const [open, setOpen] = useState<string | null>(null)
   return <section className="stack">
     <section className="panel">
@@ -92,8 +93,8 @@ function RecentlyEaten({ history, today, onChanged }: { history: HistoryData; to
             <span className="badge-row">{meal.source === 'LOGGED' && <Badge tone="grey">Logged</Badge>}<Badge tone="blue"><Users size={11} aria-hidden className="inline-icon" /> {meal.eaters.length}</Badge></span>
           </button>
           {open === meal.id && <div className="history-detail">
-            <WhoIsEating kind={meal.source === 'COOKED' ? 'meal' : 'log'} id={meal.id} onSaved={() => onChanged('Updated who ate this meal.')} />
-            {meal.source === 'LOGGED' && <button className="ghost-button danger-text" onClick={() => api.delete(`/households/${household.id}/eaten-logs/${meal.id}`).then(() => onChanged(`Removed ${meal.recipe.name} from your history.`))}><Trash2 size={14} aria-hidden />Remove log</button>}
+            <WhoIsEating kind={meal.source === 'COOKED' ? 'meal' : 'log'} id={meal.id} onSaved={() => void onReload()} />
+            {meal.source === 'LOGGED' && <button className="ghost-button danger-text" onClick={() => window.confirm(`Remove ${meal.recipe.name} from your eating history?`) && api.delete(`/households/${household.id}/eaten-logs/${meal.id}`).then(() => onChanged(`Removed ${meal.recipe.name} from your history.`), err => toast.error(errorMessage(err)))}><Trash2 size={14} aria-hidden />Remove log</button>}
           </div>}
         </li>)}</ul>
       </>}

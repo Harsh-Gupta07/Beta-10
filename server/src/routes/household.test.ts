@@ -38,6 +38,40 @@ describe('stock verification and notifications', () => {
   })
 })
 
+describe('household activity alerts', () => {
+  it('tells everyone else about a change, with their own unread count', async () => {
+    const owner = await signUpWithHousehold('Asha')
+    const code = (await owner.api('POST', `/households/${owner.householdId}/invite-code`)).body.inviteCode
+    const partner = client()
+    await partner('POST', '/auth/register', { name: 'Ravi', email: `ravi-${Date.now()}@example.com`, password: 'a-long-password' })
+    await partner('POST', '/households/join', { code })
+    const notes = (api: typeof partner) => api('GET', `/households/${owner.householdId}/notifications`).then(r => r.body)
+
+    // The owner hears that Ravi joined; Ravi doesn't get told about his own actions.
+    assert.deepEqual((await notes(owner.api)).items.map((n: any) => n.title), ['Ravi joined the household'])
+    assert.equal((await notes(partner)).unread, 0)
+
+    const dal = (await prisma.recipe.findFirstOrThrow({ where: { householdId: null, name: 'Dal Tadka' } })).id
+    const meal = await partner('POST', `/households/${owner.householdId}/meals`, { date: addDays(localToday('Asia/Kolkata'), 1), slot: 'DINNER', recipeId: dal })
+    await partner('POST', `/households/${owner.householdId}/pantry`, { ingredientId: await ingredientId('Rice'), quantity: 2, unit: 'kg' })
+    const ownerView = await notes(owner.api)
+    assert.equal(ownerView.unread, 3)
+    assert.match(ownerView.items[1].title, /^Ravi planned Dal Tadka for dinner on /)
+    assert.equal(ownerView.items[1].link.startsWith('/planner?week='), true)
+    assert.deepEqual([ownerView.items[0].title, ownerView.items[0].body], ['Ravi added Rice to the pantry', '2 kg in stock.'])
+
+    // Reading is per person: the owner clears theirs, and Ravi still sees the owner's later change as unread.
+    await owner.api('POST', `/households/${owner.householdId}/notifications/read`)
+    assert.equal((await notes(owner.api)).unread, 0)
+    assert.equal((await notes(owner.api)).items.every((n: any) => n.read), true)
+    await owner.api('POST', `/households/${owner.householdId}/meals/${meal.body.id}/cancel`)
+    const ravi = await notes(partner)
+    assert.equal(ravi.unread, 1)
+    assert.match(ravi.items[0].title, /^Asha cancelled Dal Tadka/)
+    assert.equal((await partner('GET', `/households/${owner.householdId}/dashboard`)).body.unreadNotifications, 1)
+  })
+})
+
 describe('household settings, members and invites', () => {
   it('lets the owner manage settings and invite members who then share the data', async () => {
     const owner = await signUpWithHousehold('Owner', 3)

@@ -5,6 +5,7 @@ import { api, errorMessage, type PantryItem } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatQuantity, relativeTime } from '../../lib/format'
 import { EmptyState, Modal, Notice, PageHeader, Segmented, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { StaplesPicker } from './StaplesPicker'
 import { categoriesOf, countByView, groupPantry, isPantryView, pantryViews, type PantryView } from './pantryFilters'
 import { PantryItemForm } from './PantryItemForm'
@@ -24,7 +25,7 @@ export function PantryPage() {
   const view: PantryView = isPantryView(params.get('view')) ? params.get('view') as PantryView : 'all'
   const adding = params.get('add') === '1'
   const addingStaples = params.get('staples') === '1'
-  const [staplesNotice, setStaplesNotice] = useState('')
+  const toast = useToast()
   const setParam = (key: string, value: string | null) => setParams(prev => { const next = new URLSearchParams(prev); if (value) next.set(key, value); else next.delete(key); return next }, { replace: true })
 
   const load = useCallback(async () => {
@@ -50,7 +51,6 @@ export function PantryPage() {
       actions={<><Link className="ghost-button" to="/verify"><ClipboardCheck size={15} aria-hidden />Quick stock check</Link><button className="secondary-button" onClick={() => setParam('staples', '1')}><ListChecks size={16} aria-hidden />Add staples</button><button className="primary-button" onClick={() => setParam('add', '1')}><Plus size={16} aria-hidden />Add item</button></>} />
 
     {error && <Notice onRetry={load}>{error}</Notice>}
-    {staplesNotice && <Notice tone="success">{staplesNotice}</Notice>}
     {items === null && !error && <Spinner label="Loading pantry…" />}
 
     {items && items.length === 0 && <section className="panel"><EmptyState icon={Refrigerator} title="Your pantry is empty"
@@ -85,10 +85,10 @@ export function PantryPage() {
     </>}
 
     {addingStaples && <Modal wide title="Add everyday staples" subtitle="Untick what you don’t have and adjust amounts. Everything is saved as Estimated." onClose={() => setParam('staples', null)}>
-      <StaplesPicker householdId={household.id} onDone={async ({ added, skipped }) => { setParam('staples', null); await load(); setStaplesNotice(`Added ${added} staple${added === 1 ? '' : 's'}${skipped ? ` (${skipped} already in your pantry)` : ''}. They’re marked Estimated; confirm them with a quick stock check.`) }} />
+      <StaplesPicker householdId={household.id} onDone={async ({ added, skipped }) => { setParam('staples', null); await load(); toast.success(`Added ${added} staple${added === 1 ? '' : 's'}${skipped ? ` (${skipped} already in your pantry)` : ''}. They’re marked Estimated; confirm them with a quick stock check.`) }} />
     </Modal>}
-    {adding && <PantryItemForm existingIngredientIds={existingIngredientIds} onClose={() => setParam('add', null)} onSaved={item => { upsert(item); setParam('add', null); setSelectedId(item.id) }} />}
-    {editing && <PantryItemForm item={editing} existingIngredientIds={existingIngredientIds} onClose={() => setEditingId(null)} onSaved={item => { upsert(item); setEditingId(null) }} />}
+    {adding && <PantryItemForm existingIngredientIds={existingIngredientIds} onClose={() => setParam('add', null)} onSaved={item => { upsert(item); setParam('add', null); setSelectedId(item.id); toast.success(`${item.ingredient.name} added to your pantry: ${formatQuantity(item.quantity, item.unit)}.`) }} />}
+    {editing && <PantryItemForm item={editing} existingIngredientIds={existingIngredientIds} onClose={() => setEditingId(null)} onSaved={item => { upsert(item); setEditingId(null); toast.success(`${item.ingredient.name} updated: ${formatQuantity(item.quantity, item.unit)}. Plans and shortages use the new amount.`) }} />}
     {selected && !editing && <PantryItemSheet key={selected.id} item={selected} onClose={() => setSelectedId(null)} onChanged={upsert}
       onDeleted={id => { setItems(prev => prev?.filter(i => i.id !== id) ?? null); setSelectedId(null) }} onEdit={() => setEditingId(selected.id)} />}
   </>

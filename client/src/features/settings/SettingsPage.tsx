@@ -3,6 +3,7 @@ import { Copy, KeyRound, LogOut, RefreshCw, Sparkles, UserMinus } from 'lucide-r
 import { api, errorMessage, type Household, type HouseholdDetails, type User } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { Badge, Field, Notice, PageHeader, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { PasswordInput } from '../../components/PasswordInput'
 import { KitchenFields, type KitchenSetup } from '../onboarding/KitchenFields'
 import { RolesEditor } from '../onboarding/RolesEditor'
@@ -16,7 +17,7 @@ export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promi
   const [details, setDetails] = useState<HouseholdDetails | null>(null)
   const [ai, setAi] = useState<{ configured: boolean; model: string | null } | null>(null)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
 
   const load = useCallback(async () => {
     setError('')
@@ -28,16 +29,15 @@ export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promi
   useEffect(() => { void load() }, [load])
 
   async function run(request: () => Promise<unknown>, success: string, refreshSession = false) {
-    setError(''); setNotice('')
-    try { await request(); setNotice(success); await load(); if (refreshSession) await onSessionChange() }
-    catch (err) { setError(errorMessage(err)) }
+    setError('')
+    try { await request(); toast.success(success); await load(); if (refreshSession) await onSessionChange() }
+    catch (err) { toast.error(errorMessage(err)) }
   }
 
   const owner = details?.yourRole === 'OWNER'
   return <>
     <PageHeader eyebrow="SETTINGS" title="Household & settings" description="Everyone in a household shares the same pantry, recipes, plan and shopping list." />
     {error && <Notice onRetry={load}>{error}</Notice>}
-    {notice && <Notice tone="success">{notice}</Notice>}
     {!details && !error && <Spinner label="Loading settings…" />}
 
     {details && <div className="settings-grid">
@@ -57,7 +57,7 @@ export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promi
             ? <>
                 <p className="muted small">Share this code. They create an account, choose “Join with a code”, and enter it.</p>
                 <div className="invite-code"><code>{details.inviteCode}</code>
-                  <button className="icon-button" aria-label="Copy invite code" onClick={async () => { try { await navigator.clipboard.writeText(details.inviteCode!); setNotice('Invite code copied.') } catch { setError('Copy isn’t allowed here; select the code instead.') } }}><Copy size={16} /></button></div>
+                  <button className="icon-button" aria-label="Copy invite code" onClick={async () => { try { await navigator.clipboard.writeText(details.inviteCode!); toast.success('Invite code copied.') } catch { setError('Copy isn’t allowed here; select the code instead.') } }}><Copy size={16} /></button></div>
                 {owner && <div className="panel-actions">
                   <button className="ghost-button" onClick={() => run(() => api.post(`/households/${household.id}/invite-code`), 'New invite code created. The old one no longer works.')}><RefreshCw size={14} aria-hidden />New code</button>
                   <button className="ghost-button" onClick={() => run(() => api.delete(`/households/${household.id}/invite-code`), 'Invites switched off.')}>Switch off invites</button>
@@ -69,12 +69,12 @@ export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promi
         </div>
       </section>
 
-      <LanguagePanel user={user} household={household} details={details} owner={owner} onSaved={async message => { setNotice(message); await onSessionChange() }} onError={setError} />
+      <LanguagePanel user={user} household={household} details={details} owner={owner} onSaved={async message => { toast.success(message); await onSessionChange() }} onError={setError} />
 
       <section className="panel">
         <p className="eyebrow">KITCHEN JOBS</p><h2 className="panel-title">Who does what</h2>
         <p className="muted small">Each person sees their own jobs first on the dashboard.</p>
-        <RolesEditor householdId={household.id} userId={user.id} owner={owner} onSaved={message => { setNotice(message); void onSessionChange() }} />
+        <RolesEditor householdId={household.id} userId={user.id} owner={owner} onSaved={message => { toast.success(message); void onSessionChange() }} />
       </section>
 
       <ProfileCard name={user.name} email={user.email} hasPassword={user.hasPassword !== false} isDemo={user.isDemo === true} onSaveName={name => run(() => api.patch('/auth/me', { name }), 'Name updated.', true)}

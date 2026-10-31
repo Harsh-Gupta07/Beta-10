@@ -4,6 +4,7 @@ import { api, errorMessage, type CookingView, type InputUnit } from '../../lib/a
 import { useSession } from '../../lib/session'
 import { baseUnit, formatDay, formatQuantity, slotLabel, unitOptions } from '../../lib/format'
 import { Badge, Modal, Notice, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 
 type Props = { mealId: string; onClose: () => void; onChanged: () => void }
 
@@ -18,6 +19,7 @@ export function CookingDialog({ mealId, onClose, onChanged }: Props) {
   const [result, setResult] = useState<{ warnings: string[]; alreadyCompleted: boolean } | null>(null)
   // One key per dialog: a double-click or retry sends the same key, and the server deducts only once.
   const idempotencyKey = useMemo(() => crypto.randomUUID(), [])
+  const toast = useToast()
 
   useEffect(() => {
     api.get<CookingView>(`${path}/cooking`).then(({ data }) => {
@@ -26,10 +28,11 @@ export function CookingDialog({ mealId, onClose, onChanged }: Props) {
     }).catch(err => setError(errorMessage(err, 'This meal could not be loaded.')))
   }, [path])
 
-  async function act(request: () => Promise<{ data: unknown }>) {
+  async function act(request: () => Promise<{ data: unknown }>, success: (data: unknown) => string) {
     setBusy(true); setError('')
     try {
       const { data } = await request()
+      toast.success(success(data))
       const next = (data as { meal?: CookingView }).meal ?? (await api.get<CookingView>(`${path}/cooking`)).data
       setView(next)
       if ((data as { warnings?: string[] }).warnings) setResult(data as { warnings: string[]; alreadyCompleted: boolean })
@@ -41,7 +44,9 @@ export function CookingDialog({ mealId, onClose, onChanged }: Props) {
   const complete = () => act(() => api.post(`${path}/complete`, {
     idempotencyKey,
     usage: Object.entries(usage).filter(([, u]) => u.quantity.trim() !== '').map(([ingredientId, u]) => ({ ingredientId, quantity: u.quantity.trim(), unit: u.unit })),
-  }))
+  }), data => (data as { alreadyCompleted?: boolean }).alreadyCompleted
+    ? `${view?.recipe.name} was already marked as cooked, so stock wasn’t deducted again.`
+    : `${view?.recipe.name} is cooked. What you used was taken out of the pantry.`)
 
   const done = view?.status === 'COMPLETED'
   const footer = !view ? undefined : done
@@ -49,8 +54,8 @@ export function CookingDialog({ mealId, onClose, onChanged }: Props) {
     : view.status === 'CANCELLED' ? <button className="ghost-button" onClick={onClose}>Close</button>
     : <>
         {view.status === 'COOKING'
-          ? <button className="ghost-button" disabled={busy} onClick={() => act(() => api.post(`${path}/stop`))}><Pause size={15} aria-hidden />Not cooking yet</button>
-          : <button className="secondary-button" disabled={busy} onClick={() => act(() => api.post(`${path}/start`))}><ChefHat size={15} aria-hidden />Start cooking</button>}
+          ? <button className="ghost-button" disabled={busy} onClick={() => act(() => api.post(`${path}/stop`), () => `Paused ${view.recipe.name}. Nothing was taken from the pantry.`)}><Pause size={15} aria-hidden />Not cooking yet</button>
+          : <button className="secondary-button" disabled={busy} onClick={() => act(() => api.post(`${path}/start`), () => `Started cooking ${view.recipe.name}. Mark it as cooked when it’s done.`)}><ChefHat size={15} aria-hidden />Start cooking</button>}
         <button className="primary-button" disabled={busy} onClick={complete}><CircleCheck size={15} aria-hidden />{busy ? 'Saving…' : 'Mark as cooked'}</button>
       </>
 

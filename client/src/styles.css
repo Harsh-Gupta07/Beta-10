@@ -556,6 +556,7 @@ a.meal-row:hover strong { color: var(--green-dark); }
 .bell-panel ul { list-style: none; margin: 0; padding: 0; }
 .bell-panel li button { display: grid; gap: 3px; width: 100%; text-align: left; border: 0; background: transparent; padding: 10px 8px; border-radius: 8px; }
 .bell-panel li button:hover { background: var(--mint-soft); }
+.bell-panel li button.unread { background: var(--mint-soft); box-shadow: inset 3px 0 0 var(--green); }
 .bell-panel li strong { font-size: 13px; }
 .bell-panel li span { font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
 .bell-panel li small { font-size: 11px; color: var(--muted); }
@@ -828,3 +829,18 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
   .check-button { position: relative; width: 26px; height: 26px; }
   .check-button::after { content: ''; position: absolute; inset: -9px; }
 }
+
+/* Toasts: confirmations of the change you just made. Bottom centre, above the phone tab bar. */
+.toast-region { position: fixed; z-index: 60; left: 50%; bottom: 24px; transform: translateX(-50%); display: grid; gap: 8px; width: min(440px, calc(100vw - 24px)); pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 14px; border-radius: 10px; background: var(--ink); color: #fff; font-size: 13.5px; line-height: 1.45; box-shadow: var(--shadow); animation: toast-in .18s ease-out; }
+.toast > span { flex: 1; }
+.toast > svg { flex: none; margin-top: 1px; }
+.toast.success > svg { color: #8fd8a8; }
+.toast.error { background: #7d2a23; }
+.toast.info > svg { color: #f3c99f; }
+.toast-close { flex: none; display: grid; place-items: center; width: 26px; height: 26px; margin: -3px -3px 0 0; border: 0; border-radius: 6px; background: transparent; color: #ffffffb3; }
+.toast-close:hover { background: #ffffff1a; color: #fff; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+@media (max-width: 760px) { .toast-region { bottom: calc(76px + env(safe-area-inset-bottom)); } }
+@media (pointer: coarse) { .toast-close { width: 40px; height: 40px; margin: -9px -8px -9px 0; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

@@ -5,6 +5,7 @@ import { api, errorMessage, type MealSlot, type PlannedMeal, type RecipeSummary 
 import { useSession } from '../../lib/session'
 import { formatDay, formatQuantity, slotLabel, slots, statusLabel } from '../../lib/format'
 import { Badge, Modal, Notice } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { RecipePicker } from './RecipePicker'
 import { ServingsStepper } from './AddMealDialog'
 import { WhoIsEating } from '../suggestions/WhoIsEating'
@@ -23,10 +24,12 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const path = `/households/${household.id}/meals/${meal.id}`
+  const toast = useToast()
+  const when = `${slotLabel[meal.slot].toLowerCase()} on ${formatDay(meal.date)}`
 
-  async function run(request: () => Promise<unknown>) {
+  async function run(request: () => Promise<unknown>, success: string) {
     setBusy(true); setError('')
-    try { await request(); await onChanged(); setMode('idle') }
+    try { await request(); await onChanged(); setMode('idle'); toast.success(success) }
     catch (err) { setError(errorMessage(err)) }
     finally { setBusy(false) }
   }
@@ -35,7 +38,7 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
   return <Modal wide title={meal.recipe.name} onClose={onClose}
     subtitle={<span className="meal-subtitle">{formatDay(meal.date, 'long')} · {slotLabel[meal.slot]} <Badge tone={statusTone[meal.status]}>{statusLabel[meal.status]}</Badge></span>}
     footer={mode === 'cancel'
-      ? <><span className="confirm-text">Cancel this meal? Its reserved stock is released.</span><button className="ghost-button" onClick={() => setMode('idle')}>Keep it</button><button className="danger-button" disabled={busy} onClick={() => run(() => api.post(`${path}/cancel`))}>{busy ? 'Cancelling…' : 'Cancel meal'}</button></>
+      ? <><span className="confirm-text">Cancel this meal? Its reserved stock is released.</span><button className="ghost-button" onClick={() => setMode('idle')}>Keep it</button><button className="danger-button" disabled={busy} onClick={() => run(() => api.post(`${path}/cancel`), `${meal.recipe.name} for ${when} is cancelled. Its reserved stock is free again.`)}>{busy ? 'Cancelling…' : 'Cancel meal'}</button></>
       : <><Link className="ghost-button" to={`/recipes/${meal.recipe.id}`}><BookOpen size={15} aria-hidden />View recipe</Link>
           {editable && <button className="ghost-button danger-text" onClick={() => setMode('cancel')}><CircleX size={15} aria-hidden />Cancel meal</button>}
           {(meal.status === 'PLANNED' || meal.status === 'COOKING') && <button className="primary-button" onClick={onCook}><ChefHat size={15} aria-hidden />{meal.status === 'COOKING' ? 'Continue cooking' : 'Cook'}</button>}
@@ -44,7 +47,7 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
 
     {editable && <div className="sheet-toolbar">
       <ServingsStepper value={servings} onChange={setServings} />
-      {servings !== meal.servings && <button className="primary-button" disabled={busy} onClick={() => run(() => api.patch(path, { servings }))}>Save servings</button>}
+      {servings !== meal.servings && <button className="primary-button" disabled={busy} onClick={() => run(() => api.patch(path, { servings }), `${meal.recipe.name} is now for ${servings} servings. Reserved stock was updated.`)}>Save servings</button>}
       <span className="toolbar-spacer" />
       <button className={`choice-button compact ${mode === 'recipe' ? 'active' : ''}`} onClick={() => setMode(mode === 'recipe' ? 'idle' : 'recipe')}><Repeat size={15} aria-hidden />Change recipe</button>
       <button className={`choice-button compact ${mode === 'move' ? 'active' : ''}`} onClick={() => setMode(mode === 'move' ? 'idle' : 'move')}><ArrowRightLeft size={15} aria-hidden />Move</button>
@@ -53,7 +56,7 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
 
     {mode === 'recipe' && <section className="sheet-section">
       <h3>Choose a different recipe</h3>
-      <RecipePicker recipes={recipes} selectedId={meal.recipe.id} onSelect={recipe => recipe.id !== meal.recipe.id && run(() => api.patch(path, { recipeId: recipe.id }))} />
+      <RecipePicker recipes={recipes} selectedId={meal.recipe.id} onSelect={recipe => recipe.id !== meal.recipe.id && run(() => api.patch(path, { recipeId: recipe.id }), `Swapped ${meal.recipe.name} for ${recipe.name} (${when}).`)} />
     </section>}
 
     {mode === 'move' && <section className="sheet-section">
@@ -61,7 +64,7 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
       <div className="inline-form">
         <input type="date" value={moveDate} min={today} onChange={e => setMoveDate(e.target.value)} aria-label="New date" />
         <select value={moveSlot} onChange={e => setMoveSlot(e.target.value as MealSlot)} aria-label="New meal slot">{slots.map(s => <option key={s} value={s}>{slotLabel[s]}</option>)}</select>
-        <button className="primary-button" disabled={busy || (moveDate === meal.date && moveSlot === meal.slot)} onClick={() => run(() => api.patch(path, { date: moveDate, slot: moveSlot }))}>Move meal</button>
+        <button className="primary-button" disabled={busy || (moveDate === meal.date && moveSlot === meal.slot)} onClick={() => run(() => api.patch(path, { date: moveDate, slot: moveSlot }), `${meal.recipe.name} moved to ${slotLabel[moveSlot].toLowerCase()} on ${formatDay(moveDate)}.`)}>Move meal</button>
       </div>
     </section>}
 

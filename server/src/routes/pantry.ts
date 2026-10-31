@@ -4,6 +4,9 @@ import { CANONICAL_UNITS, INPUT_UNITS } from '../services/units.js'
 import * as pantry from '../services/pantry.js'
 import * as staples from '../services/staples.js'
 import { ALLERGENS } from '../services/foodSafety.js'
+import { describeQuantity } from '../services/units.js'
+import { prisma } from '../lib/prisma.js'
+import { amount, announce } from './activity.js'
 
 // Mounted under /households/:householdId, after requireUser + requireHouseholdMember.
 export const pantryRouter = Router({ mergeParams: true })
@@ -29,13 +32,17 @@ const foodTags = {
 
 pantryRouter.post('/ingredients', async (req, res) => {
   const input = z.object({ name: z.string().trim().min(2).max(60), category: z.string().trim().max(40).default('Other'), canonicalUnit: z.enum(CANONICAL_UNITS), ...foodTags }).parse(req.body)
-  res.status(201).json(await pantry.createIngredient(ctx(res).householdId, input))
+  const ingredient = await pantry.createIngredient(ctx(res).householdId, input)
+  await announce(res, `added a custom ingredient: ${ingredient.name}`, { link: '/pantry' })
+  res.status(201).json(ingredient)
 })
 
 // Only the household's own ingredients can be tagged; the built-in catalog is maintained in the seed.
 pantryRouter.patch('/ingredients/:ingredientId', async (req, res) => {
   const input = z.object(foodTags).parse(req.body)
-  res.json(await pantry.tagIngredient(ctx(res).householdId, String(req.params.ingredientId), input))
+  const ingredient = await pantry.tagIngredient(ctx(res).householdId, String(req.params.ingredientId), input)
+  await announce(res, `updated the diet and allergy tags for ${ingredient.name}`, { link: '/pantry' })
+  res.json(ingredient)
 })
 
 pantryRouter.get('/pantry', async (_req, res) => {
@@ -51,7 +58,9 @@ pantryRouter.post('/pantry/staples', async (req, res) => {
     items: z.array(z.object({ ingredientId: z.string().min(1).max(40), quantity, unit })).min(1, 'Tick at least one staple.').max(100),
   }).parse(req.body)
   const { householdId, userId } = ctx(res)
-  res.status(201).json(await staples.addStaples(householdId, userId, items))
+  const result = await staples.addStaples(householdId, userId, items)
+  if (result.added) await announce(res, `added ${result.added} staple${result.added === 1 ? '' : 's'} to the pantry`, { link: '/pantry' })
+  res.status(201).json(result)
 })
 
 pantryRouter.post('/pantry', async (req, res) => {
@@ -61,14 +70,18 @@ pantryRouter.post('/pantry', async (req, res) => {
     source: z.enum(['MANUAL', 'PURCHASE']).optional(), purchasedAt: date.nullable().optional(), expiresAt: date.nullable().optional(),
   }).parse(req.body)
   const { householdId, userId } = ctx(res)
-  res.status(201).json(await pantry.addPantryItem(householdId, userId, input))
+  const item = await pantry.addPantryItem(householdId, userId, input)
+  await announce(res, `added ${item.ingredient.name} to the pantry`, { body: `${describeQuantity(item.quantity, item.unit)} in stock.`, link: '/pantry' })
+  res.status(201).json(item)
 })
 
 // Adds stock that has physically arrived. A client-supplied idempotency key makes repeated clicks safe.
 pantryRouter.post('/pantry/receive', async (req, res) => {
   const input = z.object({ ingredientId: z.string().min(1), quantity, unit: unit.optional(), note, idempotencyKey: z.string().uuid().optional() }).parse(req.body)
   const { householdId, userId } = ctx(res)
-  res.status(201).json(await pantry.receiveStock(householdId, userId, input))
+  const item = await pantry.receiveStock(householdId, userId, input)
+  await announce(res, `added ${amount(input.quantity, input.unit, item.unit)} of ${item.ingredient.name} to the pantry`, { body: `Now ${describeQuantity(item.quantity, item.unit)} in stock.`, link: '/pantry' })
+  res.status(201).json(item)
 })
 
 pantryRouter.patch('/pantry/:itemId', async (req, res) => {
@@ -77,13 +90,17 @@ pantryRouter.patch('/pantry/:itemId', async (req, res) => {
     confidence: confidence.optional(), purchasedAt: date.nullable().optional(), expiresAt: date.nullable().optional(), note,
   }).parse(req.body)
   const { householdId, userId } = ctx(res)
-  res.json(await pantry.updatePantryItem(householdId, userId, itemId(req.params), input))
+  const item = await pantry.updatePantryItem(householdId, userId, itemId(req.params), input)
+  await announce(res, `updated ${item.ingredient.name} in the pantry`, { body: `Now ${describeQuantity(item.quantity, item.unit)}.`, link: '/pantry' })
+  res.json(item)
 })
 
 pantryRouter.post('/pantry/:itemId/use', async (req, res) => {
   const input = z.object({ quantity, unit: unit.optional(), note }).parse(req.body)
   const { householdId, userId } = ctx(res)
-  res.json(await pantry.recordUsage(householdId, userId, itemId(req.params), input))
+  const item = await pantry.recordUsage(householdId, userId, itemId(req.params), input)
+  await announce(res, `used ${amount(input.quantity, input.unit, item.unit)} of ${item.ingredient.name}`, { body: `${describeQuantity(item.quantity, item.unit)} left.`, link: '/pantry' })
+  res.json(item)
 })
 
 pantryRouter.post('/pantry/:itemId/verify', async (req, res) => {
@@ -93,12 +110,18 @@ pantryRouter.post('/pantry/:itemId/verify', async (req, res) => {
     z.object({ action: z.literal('update'), quantity, unit: unit.optional(), note }),
   ]).parse(req.body)
   const { householdId, userId } = ctx(res)
-  res.json(await pantry.verifyPantryItem(householdId, userId, itemId(req.params), input))
+  const result = await pantry.verifyPantryItem(householdId, userId, itemId(req.params), input)
+  const { name } = result.item.ingredient, now = describeQuantity(result.item.quantity, result.item.unit)
+  await announce(res, input.action === 'finished' ? `marked ${name} as finished` : result.changed ? `corrected ${name} after a stock check` : `confirmed ${name} stock`,
+    { body: input.action === 'finished' ? 'Stock is now zero.' : result.changed ? `Was ${describeQuantity(result.previousQuantity, result.item.unit)}, now ${now}.` : `${now} is right.`, link: '/pantry' })
+  res.json(result)
 })
 
 pantryRouter.delete('/pantry/:itemId', async (req, res) => {
   const { householdId, userId } = ctx(res)
+  const item = await prisma.pantryItem.findFirst({ where: { id: itemId(req.params), householdId }, select: { ingredient: { select: { name: true } } } })
   await pantry.deletePantryItem(householdId, userId, itemId(req.params))
+  if (item) await announce(res, `removed ${item.ingredient.name} from the pantry`, { link: '/pantry' })
   res.status(204).end()
 })
 

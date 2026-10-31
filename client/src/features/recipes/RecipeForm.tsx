@@ -4,6 +4,7 @@ import { api, errorMessage, type Ingredient, type InputUnit, type RecipeDetail, 
 import { useSession } from '../../lib/session'
 import { baseUnit, unitOptions } from '../../lib/format'
 import { Field, Modal, Notice, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { SPICE_LABEL } from '../../lib/food'
 
 type Line = { key: number; ingredientId: string; quantity: string; unit: InputUnit; note: string }
@@ -36,6 +37,7 @@ export function RecipeForm({ recipe, draft, categories, onClose, onSaved }: Prop
     : [blankLine(), blankLine(), blankLine()])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const toast = useToast()
 
   useEffect(() => {
     api.get<Ingredient[]>(`/households/${household.id}/ingredients`).then(r => setCatalog(r.data)).catch(err => { setCatalog([]); setError(errorMessage(err, 'Could not load ingredients.')) })
@@ -69,6 +71,7 @@ export function RecipeForm({ recipe, draft, categories, onClose, onSaved }: Prop
     }
     try {
       const { data } = recipe ? await api.put<RecipeDetail>(`/households/${household.id}/recipes/${recipe.id}`, body) : await api.post<RecipeDetail>(`/households/${household.id}/recipes`, body)
+      toast.success(recipe ? `Changes to ${data.name} saved.` : draft ? `${data.name} saved to your recipes after your review.` : `${data.name} added to your recipes.`)
       onSaved(data)
     } catch (err) { setError(errorMessage(err, 'Could not save this recipe.')) }
     finally { setBusy(false) }

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { isDateString } from '../services/dates.js'
 import * as planner from '../services/planner.js'
+import { announce, describeMeal } from './activity.js'
 
 // Mounted under /households/:householdId, after requireUser + requireHouseholdMember.
 export const plannerRouter = Router({ mergeParams: true })
@@ -23,15 +24,32 @@ plannerRouter.get('/shortages', async (_req, res) => {
 
 plannerRouter.post('/meals', async (req, res) => {
   const input = z.object({ date, slot, recipeId: z.string().min(1), servings: servings.optional() }).parse(req.body)
-  res.status(201).json(await planner.createMeal(householdId(res), input))
+  const meal = await planner.createMeal(householdId(res), input)
+  const about = meal && await describeMeal(householdId(res), meal.id)
+  if (about) await announce(res, `planned ${about.text}`, { body: 'Its ingredients are now reserved.', link: about.link })
+  res.status(201).json(meal)
 })
 
 plannerRouter.patch('/meals/:mealId', async (req, res) => {
   const input = z.object({ recipeId: z.string().min(1).optional(), servings: servings.optional(), date: date.optional(), slot: slot.optional() })
     .refine(value => Object.values(value).some(v => v !== undefined), 'Nothing to change.').parse(req.body)
-  res.json(await planner.updateMeal(householdId(res), mealId(req.params), input))
+  const before = await describeMeal(householdId(res), mealId(req.params))
+  const meal = await planner.updateMeal(householdId(res), mealId(req.params), input)
+  const after = await describeMeal(householdId(res), mealId(req.params))
+  if (before && after) {
+    const changes = [
+      input.recipeId && before.name !== after.name && `swapped ${before.name} for ${after.name}`,
+      (input.date || input.slot) && before.when !== after.when && `moved to ${after.when}`,
+      input.servings && `now ${input.servings} servings`,
+    ].filter(Boolean)
+    await announce(res, `changed ${before.text}`, { body: changes.length ? `${changes.join('; ')}.` : undefined, link: after.link })
+  }
+  res.json(meal)
 })
 
 plannerRouter.post('/meals/:mealId/cancel', async (req, res) => {
-  res.json(await planner.cancelMeal(householdId(res), mealId(req.params)))
+  const about = await describeMeal(householdId(res), mealId(req.params))
+  const result = await planner.cancelMeal(householdId(res), mealId(req.params))
+  if (about) await announce(res, `cancelled ${about.text}`, { body: 'Its reserved ingredients are free again.', link: about.link })
+  res.json(result)
 })

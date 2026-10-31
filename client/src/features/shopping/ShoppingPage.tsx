@@ -4,6 +4,7 @@ import { api, errorMessage, type Ingredient, type InputUnit, type ShoppingData, 
 import { useSession } from '../../lib/session'
 import { baseUnit, formatQuantity, relativeDay, slotLabel, unitOptions } from '../../lib/format'
 import { Badge, EmptyState, Modal, Notice, PageHeader, Spinner } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 
 const isCanonical = (unit: string): unit is 'g' | 'ml' | 'count' => unit === 'g' || unit === 'ml' || unit === 'count'
 const itemQty = (item: Pick<ShoppingItem, 'quantity' | 'unit'>, value = item.quantity) => isCanonical(item.unit) ? formatQuantity(value, item.unit) : `${Number(value)} ${item.unit}`
@@ -13,7 +14,7 @@ export function ShoppingPage() {
   const base = `/households/${household.id}/shopping`
   const [data, setData] = useState<ShoppingData | null>(null)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
   const [receiving, setReceiving] = useState<ShoppingItem | null>(null)
   const [adding, setAdding] = useState(false)
 
@@ -25,9 +26,9 @@ export function ShoppingPage() {
   useEffect(() => { void load() }, [load])
 
   async function run(request: () => Promise<unknown>, success?: string) {
-    setError(''); setNotice('')
-    try { await request(); if (success) setNotice(success); await load() }
-    catch (err) { setError(errorMessage(err)) }
+    setError('')
+    try { await request(); if (success) toast.success(success); await load() }
+    catch (err) { toast.error(errorMessage(err)) }
   }
 
   const groups = useMemo(() => ({
@@ -42,11 +43,11 @@ export function ShoppingPage() {
     const text = listText()
     try {
       if (navigator.share) { await navigator.share({ title: 'Shopping list', text }); return }
-      await navigator.clipboard.writeText(text); setNotice('Shopping list copied. Paste it into WhatsApp or your grocery app.')
+      await navigator.clipboard.writeText(text); toast.success('Shopping list copied. Paste it into WhatsApp or your grocery app.')
     } catch { /* user dismissed the share sheet */ }
   }
   async function copy() {
-    try { await navigator.clipboard.writeText(listText()); setNotice('Shopping list copied. Paste it into WhatsApp or your grocery app.') }
+    try { await navigator.clipboard.writeText(listText()); toast.success('Shopping list copied. Paste it into WhatsApp or your grocery app.') }
     catch { setError('Copying isn’t allowed in this browser. Use Share instead.') }
   }
 
@@ -59,7 +60,6 @@ export function ShoppingPage() {
       </>} />
 
     {error && <Notice onRetry={load}>{error}</Notice>}
-    {notice && <Notice tone="success">{notice}</Notice>}
     {!data && !error && <Spinner label="Loading shopping list…" />}
 
     {data && <>
@@ -82,17 +82,17 @@ export function ShoppingPage() {
         : <>
             <ItemGroup title="To buy" items={groups.needed} empty="Nothing left to buy."
               render={item => <>
-                <button className="check-button" aria-label={`Mark ${item.name} as purchased`} onClick={() => run(() => api.patch(`${base}/items/${item.id}`, { status: 'PURCHASED' }))} />
+                <button className="check-button" aria-label={`Mark ${item.name} as purchased`} onClick={() => run(() => api.patch(`${base}/items/${item.id}`, { status: 'PURCHASED' }), `${item.name} marked as bought. Confirm it when it arrives to add it to the pantry.`)} />
                 <ItemText item={item} />
                 <button className="secondary-button small-button" onClick={() => setReceiving(item)}><PackageCheck size={14} aria-hidden />Received</button>
-                <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => window.confirm(`Remove ${item.name} from the list?`) && run(() => api.delete(`${base}/items/${item.id}`))}><Trash2 size={15} /></button>
+                <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => window.confirm(`Remove ${item.name} from the list?`) && run(() => api.delete(`${base}/items/${item.id}`), `${item.name} removed from the list.`)}><Trash2 size={15} /></button>
               </>} />
             {groups.purchased.length > 0 && <ItemGroup title="Purchased, waiting to arrive" items={groups.purchased}
               render={item => <>
-                <button className="check-button checked" aria-label={`Mark ${item.name} as not purchased`} onClick={() => run(() => api.patch(`${base}/items/${item.id}`, { status: 'NEEDED' }))}><Check size={13} /></button>
+                <button className="check-button checked" aria-label={`Mark ${item.name} as not purchased`} onClick={() => run(() => api.patch(`${base}/items/${item.id}`, { status: 'NEEDED' }), `${item.name} is back on the list.`)}><Check size={13} /></button>
                 <ItemText item={item} />
                 <button className="primary-button small-button" onClick={() => setReceiving(item)}><PackageCheck size={14} aria-hidden />Confirm received</button>
-                <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => window.confirm(`Remove ${item.name} from the list?`) && run(() => api.delete(`${base}/items/${item.id}`))}><Trash2 size={15} /></button>
+                <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => window.confirm(`Remove ${item.name} from the list?`) && run(() => api.delete(`${base}/items/${item.id}`), `${item.name} removed from the list.`)}><Trash2 size={15} /></button>
               </>} />}
             {groups.received.length > 0 && <ItemGroup title="Received into pantry" items={groups.received}
               action={<button className="link-button" onClick={() => window.confirm('Clear received items from the list? Your pantry and stock history stay as they are.') && run(() => api.post(`${base}/clear-received`), 'Cleared received items. Stock history is kept.')}>Clear</button>}
@@ -103,8 +103,8 @@ export function ShoppingPage() {
           </>}
     </>}
 
-    {receiving && <ReceiveDialog item={receiving} onClose={() => setReceiving(null)} onDone={async message => { setReceiving(null); setNotice(message); await load() }} path={`${base}/items/${receiving.id}/receive`} />}
-    {adding && <AddItemDialog path={`${base}/items`} householdId={household.id} onClose={() => setAdding(false)} onAdded={async name => { setAdding(false); setNotice(`${name} added.`); await load() }} />}
+    {receiving && <ReceiveDialog item={receiving} onClose={() => setReceiving(null)} onDone={async message => { setReceiving(null); toast.success(message); await load() }} path={`${base}/items/${receiving.id}/receive`} />}
+    {adding && <AddItemDialog path={`${base}/items`} householdId={household.id} onClose={() => setAdding(false)} onAdded={async name => { setAdding(false); toast.success(`${name} added.`); await load() }} />}
   </>
 }
 

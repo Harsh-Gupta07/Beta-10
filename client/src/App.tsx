@@ -5,6 +5,7 @@ import { SessionContext, type Session } from './lib/session'
 import { AppShell } from './components/AppShell'
 import { Spinner } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { useToast } from './components/Toast'
 import { AuthScreen } from './features/auth/AuthScreen'
 import { Onboarding } from './features/onboarding/Onboarding'
 import { DashboardPage } from './features/dashboard/DashboardPage'
@@ -26,6 +27,7 @@ function App() {
   const [household, setHousehold] = useState<Household | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const toast = useToast()
 
   const refresh = useCallback(async () => {
     setError('')
@@ -48,15 +50,18 @@ function App() {
   useEffect(() => {
     if (!signedIn) return
     const id = api.interceptors.response.use(undefined, error => {
-      if (error?.response?.status === 401 && !String(error.config?.url ?? '').startsWith('/auth/')) void refresh()
+      if (error?.response?.status === 401 && !String(error.config?.url ?? '').startsWith('/auth/')) {
+        toast.info('Your session ended. Please sign in again.')
+        void refresh()
+      }
       return Promise.reject(error)
     })
     return () => api.interceptors.response.eject(id)
-  }, [signedIn, refresh])
+  }, [signedIn, refresh, toast])
 
   const signOut = useCallback(async () => {
-    try { await api.post('/auth/logout') } finally { setUser(null); setHousehold(null) }
-  }, [])
+    try { await api.post('/auth/logout'); toast.info('You’re signed out.') } finally { setUser(null); setHousehold(null) }
+  }, [toast])
 
   const session = useMemo<Session | null>(() => user && household ? { user, household, signOut } : null, [user, household, signOut])
 
