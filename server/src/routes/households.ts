@@ -15,6 +15,7 @@ import * as households from '../services/household.js'
 import { listNotifications, markAllRead } from '../services/notifications.js'
 import { getVerificationQueue } from '../services/verification.js'
 import * as foodPreferences from '../services/foodPreferences.js'
+import { AGE_GROUPS, ALLERGENS, DIET_TYPES, HEALTH_GOALS, WEEKDAYS } from '../services/foodSafety.js'
 import type { HouseholdRole } from '@prisma/client'
 import { env } from '../config/env.js'
 import { rateLimit } from '../lib/rateLimit.js'
@@ -72,6 +73,39 @@ householdRouter.get('/:householdId/verification', requireHouseholdMember, async 
   res.json(await getVerificationQueue(hid(res)))
 })
 
+const familyInput = z.object({
+  name: z.string().trim().min(1).max(60),
+  ageGroup: z.enum(AGE_GROUPS).nullable().default(null),
+  dietType: z.enum(DIET_TYPES).nullable().default(null),
+  allergens: z.array(z.enum(ALLERGENS)).max(ALLERGENS.length).default([]),
+  healthGoals: z.array(z.enum(HEALTH_GOALS)).max(HEALTH_GOALS.length).default([]),
+  weeklyFasts: z.array(z.enum(WEEKDAYS)).max(7).default([]),
+})
+
+// Family profiles: people who eat at home without a login. Any member can keep them up to date.
+householdRouter.get('/:householdId/family', requireHouseholdMember, async (_req, res) => {
+  res.json(await foodPreferences.listFamily(hid(res)))
+})
+
+householdRouter.post('/:householdId/family', requireHouseholdMember, async (req, res) => {
+  res.status(201).json(await foodPreferences.addFamilyProfile(hid(res), familyInput.parse(req.body)))
+})
+
+householdRouter.put('/:householdId/family/:profileId', requireHouseholdMember, async (req, res) => {
+  res.json(await foodPreferences.updateFamilyProfile(hid(res), String(req.params.profileId), familyInput.parse(req.body)))
+})
+
+householdRouter.delete('/:householdId/family/:profileId', requireHouseholdMember, async (req, res) => {
+  await foodPreferences.deleteFamilyProfile(hid(res), String(req.params.profileId))
+  res.status(204).end()
+})
+
+/** The owner finishes the onboarding cards; from then on the app opens on the dashboard. */
+householdRouter.post('/:householdId/onboarding/complete', requireHouseholdMember, async (_req, res) => {
+  if (role(res) !== 'OWNER') return res.status(403).json({ error: 'Only the household owner can finish setup.' })
+  res.json(await prisma.household.update({ where: { id: hid(res) }, data: { onboardingCompletedAt: new Date() }, select: { id: true, onboardingCompletedAt: true } }))
+})
+
 householdRouter.get('/:householdId/food-profile', requireHouseholdMember, async (_req, res) => {
   res.json(await foodPreferences.getHouseholdFoodProfile(hid(res)))
 })
@@ -83,7 +117,7 @@ householdRouter.put('/:householdId/food-profile', requireHouseholdMember, async 
 
 householdRouter.post('/', async (req, res, next) => {
   try {
-    const input = z.object({ name: z.string().trim().min(2).max(80), defaultServings: z.coerce.number().int().min(1).max(20) }).parse(req.body)
+    const input = z.object({ name: z.string().trim().min(2).max(80), defaultServings: z.coerce.number().int().min(1).max(20), peopleCount: z.coerce.number().int().min(1).max(30).optional() }).parse(req.body)
     const user = res.locals.user as { id: string }
     // Phase 1 is one household per user; a second one would be unreachable from the app.
     if (await prisma.householdMember.findFirst({ where: { userId: user.id }, select: { id: true } })) return res.status(409).json({ error: 'You already belong to a household.' })

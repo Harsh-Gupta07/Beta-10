@@ -51,7 +51,7 @@ export async function createDemoKitchen() {
     select: { id: true },
   })
   const household = await prisma.household.create({
-    data: { name: 'Demo kitchen', defaultServings: 3, members: { create: { userId: user.id, role: 'OWNER' } }, shoppingLists: { create: { name: 'Weekly shopping' } } },
+    data: { name: 'Demo kitchen', defaultServings: 3, peopleCount: 3, onboardingCompletedAt: new Date(), members: { create: { userId: user.id, role: 'OWNER' } }, shoppingLists: { create: { name: 'Weekly shopping' } } },
     select: { id: true, timezone: true },
   })
 

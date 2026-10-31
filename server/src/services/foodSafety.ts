@@ -1,4 +1,4 @@
-import type { Allergen, DietClass, DietType } from '@prisma/client'
+import type { AgeGroup, Allergen, DietClass, DietType, Weekday } from '@prisma/client'
 
 // Pure: decides whether a recipe suits each household member from tagged ingredients and stated needs.
 // Nothing here guesses. An untagged ingredient makes the answer "unknown", never "safe".
@@ -9,6 +9,10 @@ export const ALLERGEN_LABEL: Record<Allergen, string> = {
 }
 export const ALLERGENS = Object.keys(ALLERGEN_LABEL) as [Allergen, ...Allergen[]]
 export const DIET_TYPES = ['VEGAN', 'VEGETARIAN', 'EGGETARIAN', 'NON_VEGETARIAN'] as const satisfies readonly DietType[]
+export const AGE_GROUPS = ['CHILD', 'TEEN', 'ADULT', 'SENIOR'] as const satisfies readonly AgeGroup[]
+export const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const satisfies readonly Weekday[]
+/** Soft health preferences from onboarding. They guide suggestions later; they never block a dish. */
+export const HEALTH_GOALS = ['LOW_OIL', 'LOW_SALT', 'LOW_SUGAR', 'HIGH_PROTEIN', 'HIGH_FIBRE', 'LIGHT_MEALS'] as const
 export const DIET_LABEL: Record<DietType, string> = { VEGAN: 'vegan', VEGETARIAN: 'vegetarian', EGGETARIAN: 'eggetarian', NON_VEGETARIAN: 'non-vegetarian' }
 
 // A person with diet X can eat a recipe whose diet ranks at or below X.

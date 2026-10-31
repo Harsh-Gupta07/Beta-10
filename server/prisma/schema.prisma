@@ -95,6 +95,23 @@ enum RecipePrefKind {
   DISLIKE
 }
 
+enum AgeGroup {
+  CHILD
+  TEEN
+  ADULT
+  SENIOR
+}
+
+enum Weekday {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
 /// express-session storage used by connect-pg-simple. Declared here so migrations own it.
 model Session {
   sid    String   @id @db.VarChar
@@ -137,6 +154,11 @@ model Household {
   timezone         String            @default("Asia/Kolkata")
   /// Share this code so others can join the household. Null when invites are switched off.
   inviteCode       String?           @unique
+  /// How many people usually eat at home, from onboarding.
+  peopleCount      Int?
+  /// Null until the owner finishes the onboarding cards; households created before onboarding count as done.
+  onboardingCompletedAt DateTime?
+  familyProfiles   FamilyProfile[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   members          HouseholdMember[]
@@ -249,8 +271,30 @@ model UserFoodProfile {
   /// Highest spice level the person enjoys, 1-5.
   maxSpice  Int?
   cuisines  String[]   @default([])
+  ageGroup  AgeGroup?
+  /// Soft goals such as LOW_OIL or HIGH_PROTEIN; they guide suggestions, never block a dish.
+  healthGoals String[] @default([])
+  /// Days of the week this person fasts, e.g. a Monday fast.
+  weeklyFasts Weekday[] @default([])
   updatedAt DateTime   @updatedAt
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Someone who eats at home but has no KitchenSync login, such as a child or grandparent.
+/// Their diet and allergies count for the whole household exactly like a member's.
+model FamilyProfile {
+  id          String     @id @default(cuid())
+  householdId String
+  name        String
+  ageGroup    AgeGroup?
+  dietType    DietType?
+  allergens   Allergen[] @default([])
+  healthGoals String[]   @default([])
+  weeklyFasts Weekday[]  @default([])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  household   Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  @@index([householdId])
 }
 
 model UserIngredientPref {

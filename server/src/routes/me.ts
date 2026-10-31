@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireUser } from '../middleware/auth.js'
-import { ALLERGENS, DIET_TYPES } from '../services/foodSafety.js'
+import { AGE_GROUPS, ALLERGENS, DIET_TYPES, HEALTH_GOALS, WEEKDAYS } from '../services/foodSafety.js'
 import * as preferences from '../services/foodPreferences.js'
 
 // Things that belong to the signed-in person rather than to their household.
@@ -20,6 +20,9 @@ const preferencesInput = z.object({
   likedIngredientIds: ids,
   favouriteRecipeIds: ids,
   dislikedRecipeIds: ids,
+  ageGroup: z.enum(AGE_GROUPS).nullable().optional(),
+  healthGoals: z.array(z.enum(HEALTH_GOALS)).max(HEALTH_GOALS.length).optional(),
+  weeklyFasts: z.array(z.enum(WEEKDAYS)).max(7).optional(),
 })
 
 meRouter.get('/food-preferences', async (_req, res) => {
