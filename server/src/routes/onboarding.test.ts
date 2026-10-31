@@ -67,3 +67,19 @@ describe('family profiles', () => {
     assert.deepEqual(profile.body.family.map((f: any) => f.name), ['Dadi'])
   })
 })
+
+describe('kitchen setup', () => {
+  it('saves appliances and cooking time, and uses the time in suggestions', async () => {
+    const { api, householdId } = await signUpWithHousehold('Kitchen')
+    const saved = await api('PATCH', `/households/${householdId}`, { appliances: ['GAS_STOVE', 'PRESSURE_COOKER', 'GAS_STOVE'], usualCookMinutes: 40 })
+    assert.equal(saved.status, 200)
+    assert.deepEqual([saved.body.appliances, saved.body.usualCookMinutes], [['GAS_STOVE', 'PRESSURE_COOKER'], 40])
+    assert.equal((await api('PATCH', `/households/${householdId}`, { appliances: ['TANDOOR'] })).status, 400)
+    assert.equal((await api('PATCH', `/households/${householdId}`, { usualCookMinutes: 1 })).status, 400)
+    assert.deepEqual((await api('GET', `/households/${householdId}`)).body.appliances, ['GAS_STOVE', 'PRESSURE_COOKER'])
+
+    const { body } = await api('GET', `/households/${householdId}/suggestions?limit=30`)
+    const rajma = body.suggestions.find((s: any) => s.recipe.name === 'Rajma Chawal')
+    assert.ok(rajma.reasons.some((r: any) => r.text === 'Takes 70 min; you usually have 40'))
+  })
+})

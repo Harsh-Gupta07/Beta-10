@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { rankRecipes, scoreRecipe, WEIGHTS, type Candidate, type RankContext } from './recommend.js'
 
 const dish = (id: string, overrides: Partial<Candidate> = {}): Candidate => ({
-  id, name: id, category: 'Dals & Curries', cuisine: '', spiceLevel: null, tags: [], safety: 'SUITABLE',
+  id, name: id, category: 'Dals & Curries', cuisine: '', spiceLevel: null, tags: [], safety: 'SUITABLE', minutes: 30,
   missingCount: 0, ingredientCount: 5, lastEatenDaysAgo: 30, timesEaten30: 1, eatenInSlot: {}, plannedSoon: false, favouriteOf: [], dislikedBy: [],
   ...overrides,
 })
@@ -62,5 +62,15 @@ describe('rankRecipes', () => {
 
   it('breaks ties by name so the order is stable', () => {
     assert.deepEqual(rankRecipes([dish('b'), dish('a'), dish('c')], context).map(r => r.id), ['a', 'b', 'c'])
+  })
+})
+
+describe('cooking time', () => {
+  it('ranks dishes longer than the household usually has lower, and says why', () => {
+    const quick = { slot: null, cuisines: [], spiceLimits: [], usualMinutes: 40 }
+    const slow = scoreRecipe(dish('rajma', { minutes: 70 }), quick)
+    assert.equal(slow.score, scoreRecipe(dish('rajma', { minutes: 30 }), quick).score + WEIGHTS.tooLong)
+    assert.ok(slow.reasons.some(r => r.text === 'Takes 70 min; you usually have 40'))
+    assert.equal(scoreRecipe(dish('rajma', { minutes: 70 }), context).score, scoreRecipe(dish('rajma'), context).score, 'no limit set, no change')
   })
 })

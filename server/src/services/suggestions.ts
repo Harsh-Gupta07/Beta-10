@@ -43,7 +43,7 @@ export async function getSuggestions(householdId: string, userId: string, option
     for (const meal of mine) eatenInSlot[meal.slot] = (eatenInSlot[meal.slot] ?? 0) + 1
     return {
       id: r.id, name: r.name, category: r.category, cuisine: r.cuisine, spiceLevel: r.spiceLevel, tags: r.tags,
-      safety: r.safety.status, missingCount: r.missingCount, ingredientCount: r.ingredientCount,
+      safety: r.safety.status, minutes: r.prepMinutes + r.cookMinutes, missingCount: r.missingCount, ingredientCount: r.ingredientCount,
       lastEatenDaysAgo: mine.length ? daysBetween(mine[0]!.date, outlook.today) : null,
       timesEaten30: mine.filter(meal => daysBetween(meal.date, outlook.today) <= 30).length,
       eatenInSlot,
@@ -54,7 +54,8 @@ export async function getSuggestions(householdId: string, userId: string, option
   })
   const cuisines = [...new Set([...(household?.cuisines ?? []), ...profiles.flatMap(p => p.cuisines)].map(c => c.toLowerCase()))]
   const spiceLimits = profiles.filter(p => p.maxSpice !== null).map(p => ({ name: p.user.name, max: p.maxSpice! }))
-  const ranked = rankRecipes(candidates, { slot: options.slot, cuisines, spiceLimits })
+  const usualMinutes = (await prisma.household.findUniqueOrThrow({ where: { id: householdId }, select: { usualCookMinutes: true } })).usualCookMinutes
+  const ranked = rankRecipes(candidates, { slot: options.slot, cuisines, spiceLimits, usualMinutes })
 
   const byId = new Map(recipes.map(r => [r.id, r]))
   return {

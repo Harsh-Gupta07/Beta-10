@@ -18,6 +18,7 @@ export const WEIGHTS = {
   cuisine: 5,
   tooSpicy: -10,
   slotFit: 10,
+  tooLong: -10,
 } as const
 
 /** Eaten at least this often in 30 days counts as "frequent". */
@@ -33,6 +34,8 @@ export type Candidate = {
   spiceLevel: number | null
   tags: string[]
   safety: SafetyStatus
+  /** Prep plus cook time. */
+  minutes: number
   missingCount: number
   ingredientCount: number
   /** Days since it was last eaten by the people in scope; null if never (in the history window). */
@@ -51,6 +54,8 @@ export type RankContext = {
   cuisines: string[]
   /** Each person's spice limit. */
   spiceLimits: Array<{ name: string; max: number }>
+  /** Minutes the household usually has for cooking; null if not set. */
+  usualMinutes?: number | null
 }
 
 export type Reason = { tone: 'good' | 'warn'; text: string; /** Same reason without people's names, for the AI. */ anonymous: string }
@@ -87,6 +92,7 @@ export function scoreRecipe(c: Candidate, context: RankContext): Ranked {
 
   const tooHot = c.spiceLevel === null ? [] : context.spiceLimits.filter(limit => c.spiceLevel! > limit.max).map(limit => limit.name)
   if (tooHot.length) add(WEIGHTS.tooSpicy, 'warn', `Spicier than ${people(tooHot)} likes`, 'Spicier than someone likes')
+  if (context.usualMinutes && c.minutes > context.usualMinutes) add(WEIGHTS.tooLong, 'warn', `Takes ${c.minutes} min; you usually have ${context.usualMinutes}`)
 
   if (context.slot) {
     const before = c.eatenInSlot[context.slot] ?? 0

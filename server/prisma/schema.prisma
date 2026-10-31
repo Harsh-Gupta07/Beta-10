@@ -102,6 +102,16 @@ enum AgeGroup {
   SENIOR
 }
 
+enum Appliance {
+  GAS_STOVE
+  INDUCTION
+  MICROWAVE
+  AIR_FRYER
+  OVEN
+  PRESSURE_COOKER
+  MIXER_GRINDER
+}
+
 enum Weekday {
   MON
   TUE
@@ -156,6 +166,10 @@ model Household {
   inviteCode       String?           @unique
   /// How many people usually eat at home, from onboarding.
   peopleCount      Int?
+  /// Cooking equipment in this kitchen.
+  appliances       Appliance[]       @default([])
+  /// Minutes the household usually has for cooking a meal; longer recipes rank lower in suggestions.
+  usualCookMinutes Int?
   /// Null until the owner finishes the onboarding cards; households created before onboarding count as done.
   onboardingCompletedAt DateTime?
   familyProfiles   FamilyProfile[]

@@ -5,22 +5,32 @@ import { AGE_GROUP_LABEL, DIET_LABEL } from '../../lib/food'
 import { Brand } from '../../components/AppShell'
 import { Badge, Notice, Segmented, Spinner } from '../../components/ui'
 import { PersonFields, emptyNeeds } from './PersonFields'
+import { KitchenFields, type KitchenSetup } from './KitchenFields'
 
 type Props = { user: User; household: Household | null; onChanged: () => Promise<void>; onSignOut: () => Promise<void> }
 
-/** First-time setup as short conversational cards. More cards (kitchen, roles, language) are added in later slices. */
+const STEPS = ['Your household', 'Who eats at home', 'Your kitchen']
+
+/** First-time setup as short conversational cards. More cards (roles, language) are added in later slices. */
 export function Onboarding({ user, household, onChanged, onSignOut }: Props) {
-  const step = household ? 2 : 1
+  const [kitchen, setKitchen] = useState(false)
+  const step = !household ? 1 : kitchen ? 3 : 2
+  async function finish() {
+    await api.post(`/households/${household!.id}/onboarding/complete`)
+    await onChanged()
+  }
   return <main className="onboarding">
     <header className="onboarding-head">
       <Brand />
-      <ol className="step-dots" aria-label={`Step ${step} of 2`}>
-        {['Your household', 'Who eats at home'].map((label, i) => <li key={label} className={i + 1 < step ? 'done' : i + 1 === step ? 'current' : ''} aria-current={i + 1 === step ? 'step' : undefined}>
+      <ol className="step-dots" aria-label={`Step ${step} of ${STEPS.length}`}>
+        {STEPS.map((label, i) => <li key={label} className={i + 1 < step ? 'done' : i + 1 === step ? 'current' : ''} aria-current={i + 1 === step ? 'step' : undefined}>
           <span>{i + 1 < step ? <Check size={12} aria-hidden /> : i + 1}</span>{label}
         </li>)}
       </ol>
     </header>
-    {household ? <PeopleStep user={user} household={household} onDone={onChanged} /> : <HouseholdStep user={user} onCreated={onChanged} />}
+    {!household ? <HouseholdStep user={user} onCreated={onChanged} />
+      : kitchen ? <KitchenStep household={household} onBack={() => setKitchen(false)} onFinish={finish} />
+      : <PeopleStep user={user} household={household} onNext={() => setKitchen(true)} />}
     <p className="switch-auth">Signed in as {user.email}. <button type="button" onClick={() => void onSignOut()}>Sign out</button></p>
   </main>
 }
@@ -66,7 +76,38 @@ function HouseholdStep({ user, onCreated }: { user: User; onCreated: () => Promi
   </section>
 }
 
-function PeopleStep({ user, household, onDone }: { user: User; household: Household; onDone: () => Promise<void> }) {
+function KitchenStep({ household, onBack, onFinish }: { household: Household; onBack: () => void; onFinish: () => Promise<void> }) {
+  const [setup, setSetup] = useState<KitchenSetup>({ appliances: household.appliances ?? [], usualCookMinutes: household.usualCookMinutes ?? null, cuisines: [], defaultServings: household.defaultServings })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function done(save: boolean) {
+    setBusy(true); setError('')
+    try {
+      if (save) {
+        await api.patch(`/households/${household.id}`, { appliances: setup.appliances, usualCookMinutes: setup.usualCookMinutes, defaultServings: setup.defaultServings })
+        if (setup.cuisines.length) await api.put(`/households/${household.id}/food-profile`, { cuisines: setup.cuisines })
+      }
+      await onFinish()
+    } catch (err) { setError(errorMessage(err, 'Could not save your kitchen.')); setBusy(false) }
+  }
+
+  return <section className="onboarding-card wide">
+    <p className="eyebrow">STEP 3</p>
+    <h1>Tell us about your kitchen</h1>
+    <p className="muted">So ideas fit how you really cook: the time you have, the food you love and the equipment you own.</p>
+    {error && <Notice>{error}</Notice>}
+    <KitchenFields value={setup} onChange={setSetup} disabled={busy} />
+    <div className="onboarding-actions">
+      <button type="button" className="ghost-button" onClick={onBack} disabled={busy}>Back</button>
+      <span className="toolbar-spacer" />
+      <button type="button" className="ghost-button" onClick={() => done(false)} disabled={busy}>Skip for now</button>
+      <button type="button" className="primary-button" onClick={() => done(true)} disabled={busy}>{busy ? 'Finishing…' : 'Finish setup'}</button>
+    </div>
+  </section>
+}
+
+function PeopleStep({ user, household, onNext }: { user: User; household: Household; onNext: () => void }) {
   const [mine, setMine] = useState<FoodPreferences | null>(null)
   const [me, setMe] = useState<PersonNeeds>(emptyNeeds)
   const [family, setFamily] = useState<FamilyProfile[]>([])
@@ -103,12 +144,6 @@ function PeopleStep({ user, household, onDone }: { user: User; household: Househ
     setDraft(person ? { name: person.name, needs: { ageGroup: person.ageGroup, dietType: person.dietType, allergens: person.allergens, healthGoals: person.healthGoals, weeklyFasts: person.weeklyFasts } } : { name: '', needs: emptyNeeds })
     setEditing(person ? person.id : 'new')
   }
-  async function finish() {
-    setBusy(true); setError('')
-    try { await api.post(`/households/${household.id}/onboarding/complete`); await onDone() }
-    catch (err) { setError(errorMessage(err)); setBusy(false) }
-  }
-
   if (!mine) return <section className="onboarding-card">{error ? <Notice onRetry={load}>{error}</Notice> : <Spinner label="Loading…" />}</section>
   const expected = household.peopleCount ?? 1
   const remaining = Math.max(0, expected - 1 - family.length)
@@ -138,8 +173,7 @@ function PeopleStep({ user, household, onDone }: { user: User; household: Househ
     <p className="muted small">Family members with their own phone can join later with an invite code and fill in their own card.</p>
 
     <div className="onboarding-actions">
-      <button type="button" className="ghost-button" onClick={finish} disabled={busy}>Skip for now</button>
-      <button type="button" className="primary-button" onClick={finish} disabled={busy || editing !== null}>{busy ? 'Finishing…' : 'Finish setup'}</button>
+      <button type="button" className="primary-button" onClick={onNext} disabled={busy || editing !== null}>Next: your kitchen</button>
     </div>
   </section>
 }

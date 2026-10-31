@@ -4,6 +4,7 @@ import { api, errorMessage, type HouseholdDetails } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { Badge, Field, Notice, PageHeader, Spinner } from '../../components/ui'
 import { PasswordInput } from '../../components/PasswordInput'
+import { KitchenFields, type KitchenSetup } from '../onboarding/KitchenFields'
 
 const TIMEZONES = ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York', 'America/Los_Angeles', 'Australia/Sydney', 'UTC']
 
@@ -81,16 +82,16 @@ export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promi
 
 function HouseholdCard({ details, owner, onSave }: { details: HouseholdDetails; owner: boolean; onSave: (body: object) => Promise<void> }) {
   const [name, setName] = useState(details.name)
-  const [servings, setServings] = useState(String(details.defaultServings))
+  const [kitchen, setKitchen] = useState<KitchenSetup>({ appliances: details.appliances ?? [], usualCookMinutes: details.usualCookMinutes ?? null, cuisines: [], defaultServings: details.defaultServings })
   const [timezone, setTimezone] = useState(details.timezone)
-  const submit = (event: FormEvent) => { event.preventDefault(); void onSave({ name, defaultServings: Number(servings), timezone }) }
+  const submit = (event: FormEvent) => { event.preventDefault(); void onSave({ name, timezone, defaultServings: kitchen.defaultServings, appliances: kitchen.appliances, usualCookMinutes: kitchen.usualCookMinutes }) }
   const zones = TIMEZONES.includes(details.timezone) ? TIMEZONES : [details.timezone, ...TIMEZONES]
   return <section className="panel">
     <p className="eyebrow">HOUSEHOLD</p><h2 className="panel-title">Kitchen details</h2>
     {!owner && <p className="muted small">Only the owner can change these.</p>}
     <form className="stack-form tight" onSubmit={submit}>
       <Field label="Household name"><input value={name} onChange={e => setName(e.target.value)} minLength={2} maxLength={80} required disabled={!owner} /></Field>
-      <Field label="Usual servings" hint="Used for new meals and recipe pantry checks. Each meal can override it."><input type="number" min={1} max={20} value={servings} onChange={e => setServings(e.target.value)} required disabled={!owner} /></Field>
+      <KitchenFields value={kitchen} onChange={setKitchen} disabled={!owner} showCuisines={false} />
       <Field label="Timezone" hint="Decides when “today” starts for planning."><select value={timezone} onChange={e => setTimezone(e.target.value)} disabled={!owner}>{zones.map(z => <option key={z} value={z}>{z}</option>)}</select></Field>
       {owner && <button className="primary-button">Save household</button>}
     </form>

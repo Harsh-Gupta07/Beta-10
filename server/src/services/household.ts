@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto'
-import type { HouseholdRole } from '@prisma/client'
+import type { Appliance, HouseholdRole } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { AppError, notFound } from '../lib/errors.js'
 import { isValidTimeZone } from './dates.js'
@@ -13,16 +13,17 @@ function assertOwner(role: HouseholdRole) {
 export async function getHousehold(householdId: string, role: HouseholdRole) {
   const household = await prisma.household.findUniqueOrThrow({
     where: { id: householdId },
-    select: { id: true, name: true, defaultServings: true, timezone: true, inviteCode: true, createdAt: true,
+    select: { id: true, name: true, defaultServings: true, timezone: true, inviteCode: true, createdAt: true, peopleCount: true, appliances: true, usualCookMinutes: true,
       members: { select: { role: true, joinedAt: true, user: { select: { id: true, name: true, email: true } } }, orderBy: { joinedAt: 'asc' } } },
   })
   return { ...household, members: household.members.map(({ user, role, joinedAt }) => ({ ...user, role, joinedAt })), yourRole: role }
 }
 
-export async function updateHousehold(householdId: string, role: HouseholdRole, input: { name?: string; defaultServings?: number; timezone?: string }) {
+export async function updateHousehold(householdId: string, role: HouseholdRole, input: { name?: string; defaultServings?: number; timezone?: string; appliances?: Appliance[]; usualCookMinutes?: number | null }) {
   assertOwner(role)
   if (input.timezone && !isValidTimeZone(input.timezone)) throw new AppError(400, 'Choose a valid timezone.')
-  return prisma.household.update({ where: { id: householdId }, data: input, select: { id: true, name: true, defaultServings: true, timezone: true } })
+  const data = { ...input, ...(input.appliances ? { appliances: [...new Set(input.appliances)] } : {}) }
+  return prisma.household.update({ where: { id: householdId }, data, select: { id: true, name: true, defaultServings: true, timezone: true, appliances: true, usualCookMinutes: true } })
 }
 
 export async function createInviteCode(householdId: string, role: HouseholdRole) {

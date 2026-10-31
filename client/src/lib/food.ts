@@ -1,4 +1,4 @@
-import type { AgeGroup, Allergen, DietClass, DietType, HealthGoal, Weekday } from './api'
+import type { AgeGroup, Allergen, Appliance, DietClass, DietType, HealthGoal, Weekday } from './api'
 
 export const ALLERGEN_LABEL: Record<Allergen, string> = {
   MILK: 'Milk', EGG: 'Egg', PEANUT: 'Peanut', TREE_NUT: 'Tree nuts', GLUTEN: 'Gluten',
@@ -27,3 +27,12 @@ export const HEALTH_GOAL_LABEL: Record<HealthGoal, string> = {
   LOW_OIL: 'Less oil', LOW_SALT: 'Less salt', LOW_SUGAR: 'Less sugar / diabetic-friendly', HIGH_PROTEIN: 'More protein', HIGH_FIBRE: 'More fibre', LIGHT_MEALS: 'Light meals',
 }
 export const HEALTH_GOALS = Object.keys(HEALTH_GOAL_LABEL) as HealthGoal[]
+
+export const APPLIANCE_LABEL: Record<Appliance, string> = {
+  GAS_STOVE: 'Gas stove', INDUCTION: 'Induction', PRESSURE_COOKER: 'Pressure cooker', MIXER_GRINDER: 'Mixer grinder',
+  MICROWAVE: 'Microwave', AIR_FRYER: 'Air fryer', OVEN: 'Oven',
+}
+export const APPLIANCES = Object.keys(APPLIANCE_LABEL) as Appliance[]
+/** Choices for "how long do you usually have to cook?" in minutes. */
+export const COOK_TIMES = [15, 30, 45, 60, 90] as const
+export const CUISINE_OPTIONS = ['North Indian', 'Punjabi', 'South Indian', 'Gujarati', 'Maharashtrian', 'Bengali', 'Rajasthani', 'Indo-Chinese', 'Continental'] as const

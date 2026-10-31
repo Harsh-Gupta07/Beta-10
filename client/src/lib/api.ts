@@ -22,7 +22,8 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
   return fallback
 }
 
-export type Household = { id: string; name: string; defaultServings: number; peopleCount?: number | null; onboardingCompletedAt?: string | null; yourRole?: "OWNER" | "MEMBER" }
+export type Appliance = 'GAS_STOVE' | 'INDUCTION' | 'MICROWAVE' | 'AIR_FRYER' | 'OVEN' | 'PRESSURE_COOKER' | 'MIXER_GRINDER'
+export type Household = { id: string; name: string; defaultServings: number; peopleCount?: number | null; appliances?: Appliance[]; usualCookMinutes?: number | null; onboardingCompletedAt?: string | null; yourRole?: "OWNER" | "MEMBER" }
 /** isDemo marks a "See a demo kitchen" visitor; their kitchen is deleted at demoExpiresAt. */
 export type User = { id: string; name: string; email: string; hasPassword?: boolean; isDemo?: boolean; demoExpiresAt?: string }
 
