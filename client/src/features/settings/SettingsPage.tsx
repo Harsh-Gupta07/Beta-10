@@ -3,6 +3,7 @@ import { Copy, KeyRound, LogOut, RefreshCw, Sparkles, UserMinus } from 'lucide-r
 import { api, errorMessage, type HouseholdDetails } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { Badge, Field, Notice, PageHeader, Spinner } from '../../components/ui'
+import { PasswordInput } from '../../components/PasswordInput'
 
 const TIMEZONES = ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York', 'America/Los_Angeles', 'Australia/Sydney', 'UTC']
 
@@ -108,8 +109,8 @@ function ProfileCard({ name, email, onSaveName, onChangePassword }: { name: stri
     </form>
     <form className="stack-form tight password-form" onSubmit={async e => { e.preventDefault(); await onChangePassword(current, next); setCurrent(''); setNext('') }}>
       <h3><KeyRound size={15} aria-hidden className="inline-icon" />Change password</h3>
-      <Field label="Current password"><input type="password" value={current} onChange={e => setCurrent(e.target.value)} autoComplete="current-password" required /></Field>
-      <Field label="New password" hint="At least 10 characters."><input type="password" value={next} onChange={e => setNext(e.target.value)} minLength={10} autoComplete="new-password" required /></Field>
+      <Field label="Current password"><PasswordInput value={current} onChange={e => setCurrent(e.target.value)} autoComplete="current-password" required /></Field>
+      <Field label="New password" hint="At least 10 characters."><PasswordInput value={next} onChange={e => setNext(e.target.value)} minLength={10} autoComplete="new-password" required /></Field>
       <button className="secondary-button">Change password</button>
     </form>
   </section>

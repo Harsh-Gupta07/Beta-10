@@ -109,6 +109,8 @@ model User {
   name         String
   email        String            @unique
   passwordHash String
+  /// Set only for "See a demo kitchen" accounts; the account and its household are deleted after this time.
+  demoExpiresAt DateTime?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   memberships  HouseholdMember[]

@@ -34,6 +34,8 @@ const schema = z.object({
   AI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
   /** Tried once when the main model is overloaded, rate-limited or slow. */
   AI_FALLBACK_MODEL: z.string().trim().min(1).default('gemini-flash-lite-latest'),
+  /** OAuth Web client ID from Google Cloud Console. Public, not a secret. Empty hides "Continue with Google". */
+  GOOGLE_CLIENT_ID: z.string().trim().optional(),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV === 'production' && value.SESSION_SECRET === PLACEHOLDER_SECRET) {
     ctx.addIssue({ code: 'custom', path: ['SESSION_SECRET'], message: 'Set a real random SESSION_SECRET in production.' })

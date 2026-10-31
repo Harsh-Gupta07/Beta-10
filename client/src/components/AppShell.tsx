@@ -60,7 +60,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
     </div>}
 
-    <main className="main-content">{children}</main>
+    <main className="main-content">
+      {user.isDemo && <p className="demo-banner" role="status">You’re exploring a demo kitchen. Changes are fine to try; it’s deleted after 24 hours. <button type="button" className="link-button" onClick={() => void signOut()}>Create your own account</button></p>}
+      {children}
+    </main>
 
     <nav className="mobile-nav" aria-label="Quick">
       {mobileTabs.map(({ to, short, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => isActive ? 'active' : ''}><Icon size={19} aria-hidden /><span>{short}</span></NavLink>)}

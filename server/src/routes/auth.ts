@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js'
 import { requireUser } from '../middleware/auth.js'
 import { env } from '../config/env.js'
 import { rateLimit } from '../lib/rateLimit.js'
+import { createDemoKitchen } from '../services/demo.js'
 
 export const authRouter = Router()
 const credentials = z.object({ email: z.string().trim().email().max(254).transform(value => value.toLowerCase()), password: z.string().min(10).max(128) })
@@ -22,6 +23,22 @@ function regenerate(req: Express.Request): Promise<void> {
 function save(req: Express.Request): Promise<void> {
   return new Promise((resolve, reject) => req.session.save(error => error ? reject(error) : resolve()))
 }
+
+/** Which sign-in options this server has switched on, so the login page only shows working buttons. */
+authRouter.get('/providers', (_req, res) => {
+  res.json({ google: env.GOOGLE_CLIENT_ID ? { clientId: env.GOOGLE_CLIENT_ID } : null, apple: null })
+})
+
+const demoLimit = rateLimit({ windowMs: 60 * 60_000, max: env.RATE_LIMIT_REGISTER, key: req => `demo|${req.ip}`, message: 'Too many demo kitchens from this network. Please try again later.' })
+
+/** "See a demo kitchen": signs the visitor into a fresh private household that is deleted after a day. */
+authRouter.post('/demo', demoLimit, async (req, res, next) => {
+  try {
+    const userId = await createDemoKitchen()
+    await regenerate(req); req.session.userId = userId; await save(req)
+    res.status(201).json({ demo: true })
+  } catch (error) { next(error) }
+})
 
 authRouter.post('/register', registerLimit, async (req, res, next) => {
   try {
