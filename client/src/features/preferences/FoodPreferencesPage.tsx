@@ -4,6 +4,7 @@ import { api, errorMessage, type Allergen, type DietType, type FoodPreferences, 
 import { useSession } from '../../lib/session'
 import { ALLERGENS, ALLERGEN_LABEL, DIET_HINT, DIET_LABEL, DIET_TYPES, SPICE_LABEL } from '../../lib/food'
 import { Badge, Field, Notice, PageHeader, Spinner } from '../../components/ui'
+import { FamilyManager } from '../onboarding/FamilyManager'
 
 type Option = { id: string; name: string }
 const splitList = (value: string) => [...new Set(value.split(',').map(v => v.trim()).filter(Boolean))]
@@ -50,6 +51,7 @@ export function FoodPreferencesPage() {
         onSave={body => save(() => api.put('/me/food-preferences', body), 'Your food preferences were saved.')} />
       <div className="stack">
         <HouseholdNeedsCard profile={shared} you={user.id} />
+        <FamilyManager family={shared.family} onChanged={message => save(() => Promise.resolve(), message)} />
         <HouseholdDefaultsCard key={JSON.stringify([shared.cuisines, shared.usualSpice])} profile={shared} owner={owner}
           onSave={body => save(() => api.put(`/households/${household.id}/food-profile`, body), 'Household food defaults saved.')} />
       </div>
@@ -128,10 +130,10 @@ function ChipPicker({ label, hint, options, selected, onChange, exclude = [] }: 
 function HouseholdNeedsCard({ profile, you }: { profile: HouseholdFoodProfile; you: string }) {
   return <section className="panel">
     <p className="eyebrow">HOUSEHOLD</p><h2 className="panel-title"><Users size={16} aria-hidden className="inline-icon" />Everyone’s firm rules</h2>
-    <ul className="needs-list">{profile.members.map(m => {
+    <ul className="needs-list">{[...profile.members, ...profile.family.map(f => ({ ...f, id: `family:${f.id}`, avoidIngredients: [] as Array<{ id: string; name: string }> }))].map(m => {
       const none = !m.dietType && !m.allergens.length && !m.avoidIngredients.length
       return <li key={m.id}>
-        <strong>{m.name}{m.id === you && ' (you)'}</strong>
+        <strong>{m.name}{m.id === you && ' (you)'}{m.id.startsWith('family:') && <small className="muted"> · no login</small>}</strong>
         {none ? <span className="muted small">No restrictions set</span> : <div className="badge-row">
           {m.dietType && <Badge tone="green">{DIET_LABEL[m.dietType]}</Badge>}
           {m.allergens.map(a => <Badge key={a} tone="red">{ALLERGEN_LABEL[a]} allergy</Badge>)}

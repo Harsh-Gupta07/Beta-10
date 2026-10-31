@@ -22,7 +22,7 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
   return fallback
 }
 
-export type Household = { id: string; name: string; defaultServings: number }
+export type Household = { id: string; name: string; defaultServings: number; peopleCount?: number | null; onboardingCompletedAt?: string | null; yourRole?: "OWNER" | "MEMBER" }
 /** isDemo marks a "See a demo kitchen" visitor; their kitchen is deleted at demoExpiresAt. */
 export type User = { id: string; name: string; email: string; hasPassword?: boolean; isDemo?: boolean; demoExpiresAt?: string }
 
@@ -33,6 +33,13 @@ export type Confidence = 'CONFIRMED' | 'ESTIMATED' | 'CHECK_NEEDED'
 export type Allergen = 'MILK' | 'EGG' | 'PEANUT' | 'TREE_NUT' | 'GLUTEN' | 'SOY' | 'SESAME' | 'FISH' | 'SHELLFISH' | 'MUSTARD'
 export type DietClass = 'PLANT' | 'DAIRY' | 'EGG' | 'MEAT' | 'SEAFOOD'
 export type DietType = 'VEGAN' | 'VEGETARIAN' | 'EGGETARIAN' | 'NON_VEGETARIAN'
+export type AgeGroup = 'CHILD' | 'TEEN' | 'ADULT' | 'SENIOR'
+export type Weekday = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN'
+export type HealthGoal = 'LOW_OIL' | 'LOW_SALT' | 'LOW_SUGAR' | 'HIGH_PROTEIN' | 'HIGH_FIBRE' | 'LIGHT_MEALS'
+/** The parts of a person's needs captured on an onboarding card. */
+export type PersonNeeds = { ageGroup: AgeGroup | null; dietType: DietType | null; allergens: Allergen[]; healthGoals: HealthGoal[]; weeklyFasts: Weekday[] }
+/** Someone who eats at home without a login. */
+export type FamilyProfile = PersonNeeds & { id: string; name: string }
 
 export type Ingredient = {
   id: string; name: string; category: string; canonicalUnit: CanonicalUnit; householdId: string | null
@@ -50,6 +57,7 @@ export type RecipeSafety = {
 type NamedRef = { id: string; name: string }
 export type FoodPreferences = {
   dietType: DietType | null; allergens: Allergen[]; maxSpice: number | null; cuisines: string[]
+  ageGroup: AgeGroup | null; healthGoals: HealthGoal[]; weeklyFasts: Weekday[]
   avoidIngredients: NamedRef[]; likedIngredients: NamedRef[]; favouriteRecipes: NamedRef[]; dislikedRecipes: NamedRef[]
 }
 export type SuggestionReason = { tone: 'good' | 'warn'; text: string }
@@ -74,6 +82,7 @@ export type Attendance = { editable: boolean; members: Array<Person & { eating: 
 
 export type HouseholdFoodProfile = {
   cuisines: string[]; usualSpice: number | null
+  family: FamilyProfile[]
   members: Array<{ id: string; name: string; dietType: DietType | null; allergens: Allergen[]; avoidIngredients: NamedRef[] }>
 }
 

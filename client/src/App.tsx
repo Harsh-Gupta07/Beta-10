@@ -5,7 +5,7 @@ import { SessionContext, type Session } from './lib/session'
 import { AppShell } from './components/AppShell'
 import { Spinner } from './components/ui'
 import { AuthScreen } from './features/auth/AuthScreen'
-import { HouseholdSetup } from './features/household/HouseholdSetup'
+import { Onboarding } from './features/onboarding/Onboarding'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 
 // Pages other than the dashboard load on demand, keeping the first download small.
@@ -49,7 +49,8 @@ function App() {
 
   if (loading) return <main className="center-state"><Spinner label="Loading your kitchen…" /></main>
   if (!user) return <AuthScreen onSignedIn={refresh} error={error} />
-  if (!household || !session) return <HouseholdSetup user={user} onCreated={refresh} onSignOut={signOut} />
+  // New owners see the onboarding cards until they finish; people who joined go straight in.
+  if (!household || !session || (household.onboardingCompletedAt === null && household.yourRole === 'OWNER')) return <Onboarding user={user} household={household} onChanged={refresh} onSignOut={signOut} />
 
   return <SessionContext.Provider value={session}>
     <AppShell>

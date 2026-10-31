@@ -80,7 +80,7 @@ authRouter.get('/me', requireUser, async (_req, res, next) => {
   try {
     const user = res.locals.user as { id: string; name: string; email: string }
     const membership = await prisma.householdMember.findFirst({ where: { userId: user.id }, include: { household: true }, orderBy: { joinedAt: 'asc' } })
-    res.json({ user, household: membership?.household ?? null })
+    res.json({ user, household: membership ? { ...membership.household, yourRole: membership.role } : null })
   } catch (error) { next(error) }
 })
 

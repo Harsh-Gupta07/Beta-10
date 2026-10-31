@@ -731,3 +731,40 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
 .phone-row { display: flex; gap: 8px; }
 .phone-prefix { display: grid; place-items: center; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: #fff; font-weight: 600; font-size: 14px; }
 .phone-row input { flex: 1; min-width: 0; }
+
+/* ---------- Onboarding ---------- */
+.onboarding { min-height: 100vh; max-width: 760px; margin: 0 auto; padding: 32px 16px 48px; display: grid; gap: 18px; align-content: start; }
+.onboarding-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.step-dots { list-style: none; display: flex; gap: 14px; margin: 0; padding: 0; font-size: 12.5px; color: var(--muted); }
+.step-dots li { display: flex; align-items: center; gap: 6px; }
+.step-dots li span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line-strong); font-size: 11px; font-weight: 700; background: var(--surface); }
+.step-dots li.current { color: var(--ink); font-weight: 700; }
+.step-dots li.current span { background: var(--green); border-color: var(--green); color: #fff; }
+.step-dots li.done span { background: var(--mint); border-color: var(--mint); color: var(--green-dark); }
+.onboarding-card { padding: 30px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+.onboarding-card h1 { font: 700 30px/1.15 Newsreader, Georgia, serif; letter-spacing: -.6px; margin: 6px 0 8px; }
+.onboarding-card .segmented { margin: 18px 0 0; width: 100%; }
+.onboarding-card .segmented button { flex: 1; }
+.big-stepper { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px; border: 1px solid var(--line-strong); border-radius: 14px; background: #fff; }
+.big-stepper span { font-size: 15px; }
+.big-stepper strong { font-size: 22px; margin-right: 4px; }
+.big-stepper .icon-button { width: 44px; height: 44px; }
+.people-list { list-style: none; margin: 18px 0 12px; padding: 0; display: grid; gap: 10px; }
+.people-list > li { border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.people-list > li.open { border-color: var(--green); }
+.person-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.person-icon { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--mint); color: var(--green); }
+.person-summary { display: grid; gap: 4px; flex: 1; min-width: 0; font-size: 14px; }
+.person-actions { display: flex; gap: 4px; }
+.person-editor { display: grid; gap: 14px; padding: 4px 14px 14px; }
+.person-editor > label { display: grid; gap: 7px; }
+.person-fields { display: grid; gap: 14px; }
+.add-person { width: 100%; justify-content: center; }
+.onboarding-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+@media (max-width: 760px) {
+  .onboarding { padding: 18px 12px 32px; }
+  .onboarding-card { padding: 22px 16px; }
+  .onboarding-card h1 { font-size: 25px; }
+  .onboarding-actions { flex-direction: column-reverse; }
+  .onboarding-actions button { width: 100%; }
+}
