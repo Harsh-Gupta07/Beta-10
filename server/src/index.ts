@@ -1,8 +1,10 @@
 import { env } from './config/env.js'
 import { createApp } from './app.js'
 import { prisma } from './lib/prisma.js'
+import { scheduleDemoPurge } from './services/demo.js'
 
 const { app, pgPool } = createApp()
+const stopDemoPurge = scheduleDemoPurge()
 
 const server = app.listen(env.PORT, () => console.log(`KitchenSync API listening on http://localhost:${env.PORT}`))
 server.on('error', (error: NodeJS.ErrnoException) => {
@@ -12,6 +14,7 @@ server.on('error', (error: NodeJS.ErrnoException) => {
 })
 async function shutdown() {
   server.close()
+  stopDemoPurge()
   await Promise.all([prisma.$disconnect(), pgPool.end()])
 }
 process.on('unhandledRejection', error => console.error('Unhandled promise rejection', error))

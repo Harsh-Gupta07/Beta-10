@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { prisma } from '../lib/prisma.js'
+import { addDays, localToday } from '../services/dates.js'
 import { ingredientId, signUpWithHousehold, useTestServer } from '../test/helpers.js'
 
 useTestServer()
@@ -101,6 +102,38 @@ describe('recipes API', () => {
 
     assert.equal((await api('DELETE', `/households/${householdId}/recipes/${copy.body.id}`)).status, 204)
     assert.equal((await api('GET', `/households/${householdId}/recipes/${copy.body.id}`)).status, 404)
+  })
+
+  it('only blocks deleting a recipe for upcoming meals, and archives it when history uses it', async () => {
+    const { api, householdId } = await signUpWithHousehold('Archiver')
+    const today = localToday('Asia/Kolkata')
+    const copyOf = async (name: string) => (await api('POST', `/households/${householdId}/recipes/${await sharedRecipeId(name)}/duplicate`)).body.id as string
+
+    // An upcoming meal blocks deletion; once it is cancelled the recipe can go, but the meal keeps pointing at it.
+    const planned = await copyOf('Dal Tadka')
+    const meal = await api('POST', `/households/${householdId}/meals`, { date: addDays(today, 1), slot: 'DINNER', recipeId: planned })
+    const blocked = await api('DELETE', `/households/${householdId}/recipes/${planned}`)
+    assert.equal(blocked.status, 409)
+    assert.match(blocked.body.error, /1 upcoming meal/)
+    await api('POST', `/households/${householdId}/meals/${meal.body.id}/cancel`)
+    assert.equal((await api('DELETE', `/households/${householdId}/recipes/${planned}`)).status, 204)
+    assert.notEqual((await prisma.recipe.findUniqueOrThrow({ where: { id: planned } })).archivedAt, null)
+
+    // Eating history survives the delete, and the archived recipe disappears from lists and planning.
+    const eaten = await copyOf('Chole')
+    await api('POST', `/households/${householdId}/eaten-logs`, { recipeId: eaten, date: addDays(today, -1), slot: 'LUNCH' })
+    assert.equal((await api('DELETE', `/households/${householdId}/recipes/${eaten}`)).status, 204)
+    const history = await api('GET', `/households/${householdId}/history`)
+    assert.ok(history.body.meals.some((m: any) => m.recipe.id === eaten))
+    const listed = (await api('GET', `/households/${householdId}/recipes`)).body.recipes.map((r: any) => r.id)
+    assert.ok(!listed.includes(eaten) && !listed.includes(planned))
+    assert.equal((await api('GET', `/households/${householdId}/recipes/${eaten}`)).status, 404)
+    assert.equal((await api('POST', `/households/${householdId}/meals`, { date: addDays(today, 2), slot: 'LUNCH', recipeId: eaten })).status, 404)
+
+    // A recipe nothing ever used is removed outright.
+    const unused = await copyOf('Masala Chai')
+    assert.equal((await api('DELETE', `/households/${householdId}/recipes/${unused}`)).status, 204)
+    assert.equal(await prisma.recipe.count({ where: { id: unused } }), 0)
   })
 
   it("hides one household's recipes from another", async () => {

@@ -33,11 +33,18 @@ describe('Google sign-in', () => {
     // Signing in again finds the same account.
     assert.deepEqual(await accountForGoogle({ sub: `sub-${stamp}`, email: `g-${stamp}@example.com`, emailVerified: true, name: 'x' }), { userId: fresh.userId, isNew: false })
 
-    // An existing email account is linked, not duplicated.
+    // An existing email account is linked, not duplicated, but only once its password is given: emails aren't
+    // verified at sign-up, so otherwise whoever registered the address first would receive the owner's Google sign-in.
     const api = client()
     await api('POST', '/auth/register', { name: 'Email First', email: `e-${stamp}@example.com`, password: 'a-long-password' })
-    const linked = await accountForGoogle({ sub: `sub2-${stamp}`, email: `e-${stamp}@example.com`, emailVerified: true, name: 'x' })
+    const google = { sub: `sub2-${stamp}`, email: `e-${stamp}@example.com`, emailVerified: true, name: 'x' }
+    await assert.rejects(accountForGoogle(google), (error: any) => error.status === 409 && error.code === 'PASSWORD_REQUIRED')
+    await assert.rejects(accountForGoogle(google, 'not-the-password'), (error: any) => error.status === 401 && error.code === 'PASSWORD_REQUIRED')
+    assert.equal((await prisma.user.findUniqueOrThrow({ where: { email: google.email } })).googleSub, null)
+    const linked = await accountForGoogle(google, 'a-long-password')
     assert.equal(linked.isNew, false)
+    // After that, Google alone is enough.
+    assert.deepEqual(await accountForGoogle(google), { userId: linked.userId, isNew: false })
     assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: linked.userId } })).googleSub, `sub2-${stamp}`)
     // A second Google account can't take over that email, and unverified emails are never linked.
     await assert.rejects(accountForGoogle({ sub: `sub3-${stamp}`, email: `e-${stamp}@example.com`, emailVerified: true, name: 'x' }), /different Google account/)
@@ -99,5 +106,54 @@ describe('demo kitchen', () => {
     assert.ok(await purgeExpiredDemos() >= 1)
     assert.equal(await prisma.user.count({ where: { id: me.body.user.id } }), 0)
     assert.equal(await prisma.household.count({ where: { id: householdId } }), 0)
+  })
+
+  it('still deletes a demo whose own recipe copy is planned', async () => {
+    const api = client()
+    await api('POST', '/auth/demo')
+    const me = (await api('GET', '/auth/me')).body
+    const householdId = me.household.id
+    // A planned meal restricts its recipe; the household's own copy used to make the whole purge fail.
+    const shared = (await prisma.recipe.findFirstOrThrow({ where: { householdId: null, name: 'Masala Chai' } })).id
+    const copy = await api('POST', `/households/${householdId}/recipes/${shared}/duplicate`)
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+    assert.equal((await api('POST', `/households/${householdId}/meals`, { date: today, slot: 'BREAKFAST', recipeId: copy.body.id })).status, 201)
+
+    await prisma.user.update({ where: { id: me.user.id }, data: { demoExpiresAt: new Date(Date.now() - 1000) } })
+    await purgeExpiredDemos()
+    assert.equal(await prisma.household.count({ where: { id: householdId } }), 0)
+    assert.equal(await prisma.recipe.count({ where: { id: copy.body.id } }), 0)
+    // And new visitors can still start a demo.
+    assert.equal((await client()('POST', '/auth/demo')).status, 201)
+  })
+
+  it('does not let real accounts join a demo kitchen', async () => {
+    const api = client()
+    await api('POST', '/auth/demo')
+    const householdId = (await api('GET', '/auth/me')).body.household.id
+    assert.equal((await api('POST', `/households/${householdId}/invite-code`)).status, 403)
+    // Even a code made before this rule can't be used.
+    await prisma.household.update({ where: { id: householdId }, data: { inviteCode: `DEMO${Date.now() % 10000}` } })
+    const code = (await prisma.household.findUniqueOrThrow({ where: { id: householdId } })).inviteCode!
+    const visitor = client()
+    await visitor('POST', '/auth/register', { name: 'Visitor', email: `visitor-${Date.now()}@example.com`, password: 'a-long-password' })
+    assert.equal((await visitor('POST', '/households/join', { code })).status, 404)
+  })
+
+  it('shares one assistant budget between all demo kitchens on a network', async () => {
+    let sent = 0
+    let last = 0
+    // Each demo only sends a few messages, so the per-user limit never applies; the shared demo budget must.
+    for (let demo = 0; demo < 5 && last !== 429; demo++) {
+      const api = client()
+      await api('POST', '/auth/demo')
+      const householdId = (await api('GET', '/auth/me')).body.household.id
+      for (let i = 0; i < 5 && last !== 429; i++) {
+        last = (await api('POST', `/households/${householdId}/assistant/messages`, { message: 'What can I cook today?' })).status
+        if (last === 200) sent++
+      }
+    }
+    assert.equal(last, 429)
+    assert.equal(sent, 20)
   })
 })

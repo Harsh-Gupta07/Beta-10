@@ -108,7 +108,7 @@ export function createApp() {
 
   app.use((_req, res) => res.status(404).json({ error: 'Route not found.' }))
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    if (error instanceof AppError) return res.status(error.status).json({ error: error.message })
+    if (error instanceof AppError) return res.status(error.status).json({ error: error.message, ...(error.code ? { code: error.code } : {}) })
     if (error instanceof ZodError) return res.status(400).json({ error: 'Please check the submitted fields.', details: error.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message })) })
     if (typeof error === 'object' && error && 'type' in error && error.type === 'entity.parse.failed') return res.status(400).json({ error: 'Request body must be valid JSON.' })
     if (typeof error === 'object' && error && 'type' in error && error.type === 'entity.too.large') return res.status(413).json({ error: 'That request is too large.' })

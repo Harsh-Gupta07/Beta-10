@@ -4,6 +4,7 @@ import { AppError, notFound } from '../lib/errors.js'
 import { isCanonicalUnit, scaleQuantity, toCanonical, unitsFor, type CanonicalUnit, type InputUnit } from './units.js'
 import { assessRecipe, type MemberNeeds } from './foodSafety.js'
 import { householdNeeds } from './foodPreferences.js'
+import { localToday, toDbDate } from './dates.js'
 
 export type RecipeIngredientInput = { ingredientId: string; quantity: string | number; unit?: InputUnit; note?: string }
 export type RecipeInput = {
@@ -20,8 +21,8 @@ export type RecipeInput = {
   ingredients: RecipeIngredientInput[]
 }
 
-/** Recipes a household can see: its own plus the shared (seeded) catalog. */
-export const visibleTo = (householdId: string): Prisma.RecipeWhereInput => ({ OR: [{ householdId }, { householdId: null, isShared: true }] })
+/** Recipes a household can see: its own plus the shared (seeded) catalog. Archived recipes only live on in history. */
+export const visibleTo = (householdId: string): Prisma.RecipeWhereInput => ({ archivedAt: null, OR: [{ householdId }, { householdId: null, isShared: true }] })
 
 const lineInclude = { ingredient: { select: { id: true, name: true, category: true, canonicalUnit: true, dietClass: true, allergens: true, allergensReviewed: true } } } as const
 const recipeInclude = { ingredients: { include: lineInclude, orderBy: { position: 'asc' } } } as const satisfies Prisma.RecipeInclude
@@ -162,11 +163,18 @@ export async function updateRecipe(householdId: string, recipeId: string, input:
   return getRecipe(householdId, recipeId, input.baseServings)
 }
 
+/**
+ * Upcoming meals block deletion. Past meals and eating history don't: the recipe is archived so they keep
+ * pointing at it, and it is only removed outright when nothing ever used it.
+ */
 export async function deleteRecipe(householdId: string, recipeId: string) {
   await findOwned(householdId, recipeId)
-  const planned = await prisma.plannedMeal.count({ where: { recipeId } })
-  if (planned) throw new AppError(409, `This recipe is used by ${planned} planned meal${planned === 1 ? '' : 's'}. Change or cancel those meals first.`)
-  await prisma.recipe.delete({ where: { id: recipeId } })
+  const { timezone } = await prisma.household.findUniqueOrThrow({ where: { id: householdId }, select: { timezone: true } })
+  const upcoming = await prisma.plannedMeal.count({ where: { recipeId, OR: [{ status: 'COOKING' }, { status: 'PLANNED', date: { gte: toDbDate(localToday(timezone)) } }] } })
+  if (upcoming) throw new AppError(409, `This recipe is planned for ${upcoming} upcoming meal${upcoming === 1 ? '' : 's'}. Change or cancel those meals first.`)
+  const [meals, eaten] = await Promise.all([prisma.plannedMeal.count({ where: { recipeId } }), prisma.eatenLog.count({ where: { recipeId } })])
+  if (meals || eaten) await prisma.recipe.update({ where: { id: recipeId }, data: { archivedAt: new Date() } })
+  else await prisma.recipe.delete({ where: { id: recipeId } })
 }
 
 /** Copies any visible recipe into the household so it can be customised. */

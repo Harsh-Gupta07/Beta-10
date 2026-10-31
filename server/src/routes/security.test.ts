@@ -62,3 +62,24 @@ describe('release hardening', () => {
     assert.doesNotMatch(JSON.stringify(bad.body), /stack|prisma|at \w+ \(/i)
   })
 })
+
+// Last in the file: it uses up this network's sign-in budget, so later sign-ins here would be refused.
+describe('password spraying', () => {
+  it('limits wrong current-password attempts per account', async () => {
+    const { api } = await signUpWithHousehold('Changer')
+    const statuses: number[] = []
+    for (let i = 0; i < 11; i++) statuses.push((await api('POST', '/auth/password', { currentPassword: 'wrong-password', newPassword: 'a-new-long-password' })).status)
+    assert.deepEqual(statuses.slice(0, 10), Array(10).fill(400))
+    assert.equal(statuses[10], 429)
+  })
+
+  it('caps sign-in attempts from one network across many emails', async () => {
+    const api = client()
+    let status = 0
+    let attempts = 0
+    // One try per email never reaches the per-email limit; the per-network limit must stop it.
+    while (status !== 429 && attempts < 60) status = (await api('POST', '/auth/login', { email: `spray-${attempts++}-${Date.now()}@example.com`, password: 'Password123' })).status
+    assert.equal(status, 429)
+    assert.match((await api('POST', '/auth/login', { email: `fresh-${Date.now()}@example.com`, password: 'Password123' })).body.error, /from this network/)
+  })
+})

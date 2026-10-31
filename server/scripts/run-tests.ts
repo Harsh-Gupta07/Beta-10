@@ -23,5 +23,10 @@ function run(command: string) {
 }
 
 run('npx prisma migrate deploy')
+// A client generated before the latest schema change makes the seed and tests fail with "Unknown field".
+// On Windows this fails while a dev server holds the engine file; the existing client is then used as is.
+if (spawnSync('npx prisma generate', { shell: true, stdio: 'inherit', env }).status !== 0) {
+  console.warn('Prisma client could not be regenerated (is `npm run dev` running?). Testing with the existing client.')
+}
 run('npx tsx prisma/seed.ts')
 run('npx tsx --test --test-concurrency=1 "src/**/*.test.ts"')

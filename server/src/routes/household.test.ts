@@ -63,6 +63,10 @@ describe('household settings, members and invites', () => {
     assert.equal((await guest('POST', `/households/${owner.householdId}/invite-code`)).status, 403)
     const info = (await guest('GET', `/households/${owner.householdId}`)).body
     assert.deepEqual([info.members.length, info.yourRole], [2, 'MEMBER'])
+    // Only the owner manages invites, so members never receive the code.
+    assert.equal(info.inviteCode, null)
+    assert.equal((await guest('GET', '/auth/me')).body.household.inviteCode, undefined)
+    assert.equal((await owner.api('GET', `/households/${owner.householdId}`)).body.inviteCode, code)
 
     // Someone already in a household can't join another.
     assert.equal((await owner.api('POST', '/households/join', { code })).status, 409)

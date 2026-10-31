@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import axios from 'axios'
 import { CalendarCheck, PlayCircle, ShieldCheck, ShoppingBasket, Smartphone } from 'lucide-react'
 import { api, errorMessage } from '../../lib/api'
 import { LANDING_PHOTOS } from '../../lib/images'
@@ -22,6 +23,8 @@ export function AuthScreen({ onSignedIn, error }: { onSignedIn: () => Promise<vo
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState<'' | 'email' | 'demo' | 'google'>('')
   const [phoneOpen, setPhoneOpen] = useState(false)
+  // Set when Google matched an existing email account: its password is needed once to connect them.
+  const [linkCredential, setLinkCredential] = useState('')
   const register = mode === 'register'
 
   // If the server is down (e.g. restarting), keep checking quietly; once it answers, clear the old error.
@@ -52,11 +55,19 @@ export function AuthScreen({ onSignedIn, error }: { onSignedIn: () => Promise<vo
     finally { setBusy('') }
   }
 
-  async function google(credential: string) {
+  async function google(credential: string, password?: string) {
     setMessage(''); setBusy('google')
-    try { await api.post('/auth/google', { credential }); await onSignedIn() }
-    catch (err) { setMessage(errorMessage(err, 'Google sign-in failed. Please try again.')) }
+    try { await api.post('/auth/google', { credential, password }); setLinkCredential(''); await onSignedIn() }
+    catch (err) {
+      if (axios.isAxiosError(err) && (err.response?.data as { code?: string } | undefined)?.code === 'PASSWORD_REQUIRED') setLinkCredential(credential)
+      setMessage(errorMessage(err, 'Google sign-in failed. Please try again.'))
+    }
     finally { setBusy('') }
+  }
+
+  function connectGoogle(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void google(linkCredential, String(new FormData(event.currentTarget).get('password') ?? ''))
   }
 
   async function demo() {
@@ -93,6 +104,13 @@ export function AuthScreen({ onSignedIn, error }: { onSignedIn: () => Promise<vo
           ? <GoogleButton clientId={providers.google.clientId} onCredential={google} />
           : <button type="button" className="social-button" disabled aria-describedby="google-note"><GoogleMark />Continue with Google</button>}
         {busy === 'google' && <small className="muted">Signing you in with Google…</small>}
+        {linkCredential && <form onSubmit={connectGoogle} className="stack-form tight">
+          <label>Your KitchenSync password<PasswordInput name="password" maxLength={128} autoComplete="current-password" required autoFocus /></label>
+          <div className="panel-actions">
+            <button className="primary-button" disabled={busy !== ''}>Connect Google</button>
+            <button type="button" className="secondary-button" onClick={() => { setLinkCredential(''); setMessage('') }}>Cancel</button>
+          </div>
+        </form>}
         <button type="button" className="social-button" disabled aria-describedby="apple-note"><AppleMark />Continue with Apple</button>
         <button type="button" className="social-button" onClick={() => setPhoneOpen(!phoneOpen)} aria-expanded={phoneOpen}><Smartphone size={17} aria-hidden />Continue with phone number</button>
         {phoneOpen && <PhonePreview />}

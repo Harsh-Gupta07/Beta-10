@@ -27,10 +27,12 @@ const schema = z.object({
   /** One JSON line per request on stdout. Defaults to on in production. */
   LOG_REQUESTS: z.enum(['true', 'false']).optional(),
   // Rate limits (per window). In-memory, so they apply per server instance.
-  RATE_LIMIT_LOGIN: limit(10),        // per IP + email, 15 minutes
+  RATE_LIMIT_LOGIN: limit(10),        // per IP + email, 15 minutes (also per user for password changes)
+  RATE_LIMIT_LOGIN_IP: limit(50),     // per IP across all emails, 15 minutes
   RATE_LIMIT_REGISTER: limit(20),     // per IP, 1 hour
   RATE_LIMIT_JOIN: limit(10),         // per user, 15 minutes
   RATE_LIMIT_ASSISTANT: limit(10),    // per user, 1 minute
+  RATE_LIMIT_ASSISTANT_DEMO: limit(20), // all demo kitchens on one IP together, 1 hour
   AI_API_KEY: z.string().trim().optional(),
   /** Gemini model used by the assistant. */
   AI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),

@@ -7,6 +7,7 @@ import { pantryRouter } from './pantry.js'
 import { recipeRouter } from './recipes.js'
 import { plannerRouter } from './planner.js'
 import { overview } from '../services/planner.js'
+import { visibleTo } from '../services/recipes.js'
 import { cookingRouter } from './cooking.js'
 import { shoppingRouter } from './shopping.js'
 import { assistantRouter } from './assistant.js'
@@ -151,7 +152,7 @@ householdRouter.get('/:householdId/dashboard', requireHouseholdMember, async (_r
     const [household, pantry, recipeCount, plan, shoppingCount, activity] = await Promise.all([
       prisma.household.findUniqueOrThrow({ where: { id: householdId }, select: { id: true, name: true, defaultServings: true, timezone: true } }),
       listPantry(householdId),
-      prisma.recipe.count({ where: { OR: [{ householdId }, { isShared: true }] } }),
+      prisma.recipe.count({ where: visibleTo(householdId) }),
       overview(householdId),
       prisma.shoppingListItem.count({ where: { shoppingList: { householdId }, status: 'NEEDED' } }),
       recentActivity(householdId),

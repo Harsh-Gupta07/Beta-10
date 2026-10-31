@@ -16,7 +16,16 @@ const DUMMY_HASH = bcrypt.hashSync('timing-equaliser-not-a-real-password', 12)
 
 const emailOf = (body: unknown) => typeof body === 'object' && body && 'email' in body ? String(body.email).trim().toLowerCase().slice(0, 254) : ''
 const loginLimit = rateLimit({ windowMs: 15 * 60_000, max: env.RATE_LIMIT_LOGIN, key: req => `${req.ip}|${emailOf(req.body)}`, message: 'Too many sign-in attempts. Please wait 15 minutes and try again.' })
+// Caps one network trying a few passwords against many emails, which the per-email limit alone allows.
+const loginIpLimit = rateLimit({ windowMs: 15 * 60_000, max: env.RATE_LIMIT_LOGIN_IP, key: req => req.ip ?? 'unknown', message: 'Too many sign-in attempts from this network. Please wait 15 minutes and try again.' })
+const passwordLimit = rateLimit({ windowMs: 15 * 60_000, max: env.RATE_LIMIT_LOGIN, key: (_req, res) => (res.locals.user as { id: string }).id, message: 'Too many password attempts. Please wait 15 minutes and try again.' })
 const registerLimit = rateLimit({ windowMs: 60 * 60_000, max: env.RATE_LIMIT_REGISTER, key: req => req.ip ?? 'unknown', message: 'Too many accounts created from this network. Please try again later.' })
+
+/** The signed-in user's first household, without its invite code (owners read that from the household endpoint). */
+async function firstHousehold(userId: string) {
+  const membership = await prisma.householdMember.findFirst({ where: { userId }, include: { household: { omit: { inviteCode: true } } }, orderBy: { joinedAt: 'asc' } })
+  return membership ? { ...membership.household, yourRole: membership.role, yourKitchenRoles: membership.kitchenRoles } : null
+}
 
 function regenerate(req: Express.Request): Promise<void> {
   return new Promise((resolve, reject) => req.session.regenerate(error => error ? reject(error) : resolve()))
@@ -46,11 +55,11 @@ const googleLimit = rateLimit({ windowMs: 15 * 60_000, max: env.RATE_LIMIT_REGIS
 /** "Continue with Google": verifies Google's ID token, then signs in, links or creates the account. */
 authRouter.post('/google', googleLimit, async (req, res, next) => {
   try {
-    const { credential } = z.object({ credential: z.string().min(20).max(4096) }).parse(req.body)
-    const { userId, isNew } = await accountForGoogle(await verifyGoogleCredential(credential))
+    // `password` is only sent the first time an existing email account is connected to Google.
+    const { credential, password } = z.object({ credential: z.string().min(20).max(4096), password: z.string().min(1).max(128).optional() }).parse(req.body)
+    const { userId, isNew } = await accountForGoogle(await verifyGoogleCredential(credential), password)
     await regenerate(req); req.session.userId = userId; await save(req)
-    const membership = await prisma.householdMember.findFirst({ where: { userId }, include: { household: true }, orderBy: { joinedAt: 'asc' } })
-    res.status(isNew ? 201 : 200).json({ isNew, household: membership?.household ?? null })
+    res.status(isNew ? 201 : 200).json({ isNew, household: await firstHousehold(userId) })
   } catch (error) { next(error) }
 })
 
@@ -64,23 +73,21 @@ authRouter.post('/register', registerLimit, async (req, res, next) => {
   } catch (error) { next(error) }
 })
 
-authRouter.post('/login', loginLimit, async (req, res, next) => {
+authRouter.post('/login', loginIpLimit, loginLimit, async (req, res, next) => {
   try {
     const input = credentials.parse(req.body)
     const user = await prisma.user.findUnique({ where: { email: input.email } })
     const valid = await bcrypt.compare(input.password, user?.passwordHash ?? DUMMY_HASH)
     if (!user || !valid) return res.status(401).json({ error: 'Email or password is incorrect.' })
     await regenerate(req); req.session.userId = user.id; await save(req)
-    const membership = await prisma.householdMember.findFirst({ where: { userId: user.id }, include: { household: true }, orderBy: { joinedAt: 'asc' } })
-    res.json({ user: { id: user.id, name: user.name, email: user.email }, household: membership?.household ?? null })
+    res.json({ user: { id: user.id, name: user.name, email: user.email }, household: await firstHousehold(user.id) })
   } catch (error) { next(error) }
 })
 
 authRouter.get('/me', requireUser, async (_req, res, next) => {
   try {
     const user = res.locals.user as { id: string; name: string; email: string }
-    const membership = await prisma.householdMember.findFirst({ where: { userId: user.id }, include: { household: true }, orderBy: { joinedAt: 'asc' } })
-    res.json({ user, household: membership ? { ...membership.household, yourRole: membership.role, yourKitchenRoles: membership.kitchenRoles } : null })
+    res.json({ user, household: await firstHousehold(user.id) })
   } catch (error) { next(error) }
 })
 
@@ -96,7 +103,7 @@ authRouter.patch('/me', requireUser, async (req, res, next) => {
   } catch (error) { next(error) }
 })
 
-authRouter.post('/password', requireUser, async (req, res, next) => {
+authRouter.post('/password', requireUser, passwordLimit, async (req, res, next) => {
   try {
     const input = z.object({ currentPassword: z.string().max(128).optional(), newPassword: z.string().min(10).max(128) }).parse(req.body)
     const user = await prisma.user.findUniqueOrThrow({ where: { id: (res.locals.user as { id: string }).id } })

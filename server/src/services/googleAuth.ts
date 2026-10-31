@@ -23,16 +23,20 @@ export async function verifyGoogleCredential(credential: string): Promise<Google
 
 /**
  * The KitchenSync account for a Google profile: the one already linked to it, else the account with the same
- * verified email (which gets linked), else a new account without a password.
+ * verified email (linked once its password is given), else a new account without a password.
  */
-export async function accountForGoogle(profile: GoogleProfile) {
+export async function accountForGoogle(profile: GoogleProfile, password?: string) {
   const linked = await prisma.user.findUnique({ where: { googleSub: profile.sub }, select: { id: true } })
   if (linked) return { userId: linked.id, isNew: false }
   // Linking by email is only safe when Google has verified the address belongs to this person.
   if (!profile.emailVerified) throw new AppError(401, 'Please verify your email address with Google first, then try again.')
-  const byEmail = await prisma.user.findUnique({ where: { email: profile.email }, select: { id: true, googleSub: true } })
+  const byEmail = await prisma.user.findUnique({ where: { email: profile.email }, select: { id: true, googleSub: true, passwordHash: true } })
   if (byEmail) {
     if (byEmail.googleSub) throw new AppError(409, 'This email is already linked to a different Google account.')
+    // Sign-up doesn't verify emails yet, so anyone could have registered this address first. Linking without the
+    // password would hand the real owner's Google sign-in to that account; asking for it proves it is theirs.
+    if (!password) throw new AppError(409, 'You already have a KitchenSync account with this email. Enter its password once to connect Google.', 'PASSWORD_REQUIRED')
+    if (!(await bcrypt.compare(password, byEmail.passwordHash))) throw new AppError(401, 'That password is incorrect.', 'PASSWORD_REQUIRED')
     await prisma.user.update({ where: { id: byEmail.id }, data: { googleSub: profile.sub } })
     return { userId: byEmail.id, isNew: false }
   }

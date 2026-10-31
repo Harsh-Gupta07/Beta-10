@@ -16,7 +16,8 @@ export async function getHousehold(householdId: string, role: HouseholdRole) {
     select: { id: true, name: true, defaultServings: true, timezone: true, inviteCode: true, createdAt: true, peopleCount: true, appliances: true, usualCookMinutes: true, katoriMl: true, chammachMl: true, mutthiGrams: true,
       members: { select: { role: true, joinedAt: true, user: { select: { id: true, name: true, email: true } } }, orderBy: { joinedAt: 'asc' } } },
   })
-  return { ...household, members: household.members.map(({ user, role, joinedAt }) => ({ ...user, role, joinedAt })), yourRole: role }
+  // Only the owner manages invites, so only the owner sees the code.
+  return { ...household, inviteCode: role === 'OWNER' ? household.inviteCode : null, members: household.members.map(({ user, role, joinedAt }) => ({ ...user, role, joinedAt })), yourRole: role }
 }
 
 export async function updateHousehold(householdId: string, role: HouseholdRole, input: { name?: string; defaultServings?: number; timezone?: string; appliances?: Appliance[]; usualCookMinutes?: number | null; katoriMl?: number | null; chammachMl?: number | null; mutthiGrams?: number | null }) {
@@ -28,6 +29,9 @@ export async function updateHousehold(householdId: string, role: HouseholdRole, 
 
 export async function createInviteCode(householdId: string, role: HouseholdRole) {
   assertOwner(role)
+  // A demo kitchen is deleted with everyone in it, so nobody with a real account may join one.
+  const demo = await prisma.householdMember.count({ where: { householdId, user: { demoExpiresAt: { not: null } } } })
+  if (demo) throw new AppError(403, 'Demo kitchens can’t invite people. Create your own account to share a kitchen.')
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('')
     try { return (await prisma.household.update({ where: { id: householdId }, data: { inviteCode: code }, select: { inviteCode: true } })).inviteCode }
@@ -48,6 +52,9 @@ export async function joinHousehold(userId: string, rawCode: string) {
   if (existing) throw new AppError(409, 'You already belong to a household.')
   const household = await prisma.household.findUnique({ where: { inviteCode: code }, select: { id: true, name: true, defaultServings: true } })
   if (!household) throw new AppError(404, 'That invite code isn’t valid. Ask the household owner for a new one.')
+  if (await prisma.householdMember.count({ where: { householdId: household.id, user: { demoExpiresAt: { not: null } } } })) {
+    throw new AppError(404, 'That invite code isn’t valid. Ask the household owner for a new one.')
+  }
   await prisma.householdMember.create({ data: { householdId: household.id, userId, role: 'MEMBER' } })
   return household
 }

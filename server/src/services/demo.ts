@@ -31,11 +31,22 @@ export async function purgeExpiredDemos() {
       prisma.stockTransaction.deleteMany({ where: { householdId: { in: householdIds } } }),
       prisma.cookingEvent.deleteMany({ where: { plannedMeal: { mealPlan: { householdId: { in: householdIds } } } } }),
       prisma.inventoryVerification.deleteMany({ where: { householdId: { in: householdIds } } }),
+      // Planned meals restrict their recipe, so a planned copy of a recipe would block the household cascade.
+      prisma.plannedMeal.deleteMany({ where: { mealPlan: { householdId: { in: householdIds } } } }),
       prisma.household.deleteMany({ where: { id: { in: householdIds } } }),
       prisma.user.delete({ where: { id: user.id } }),
     ])
   }
   return expired.length
+}
+
+/** Purges expired demos every hour, so they go even when nobody starts a new demo. Returns a stop function. */
+export function scheduleDemoPurge(intervalMs = 3_600_000) {
+  const run = () => purgeExpiredDemos().catch(error => console.error('Demo purge failed', error))
+  const timer = setInterval(run, intervalMs)
+  timer.unref()
+  void run()
+  return () => clearInterval(timer)
 }
 
 /** Creates a demo user with a stocked pantry, a few planned meals and some eating history. Returns the user id. */
