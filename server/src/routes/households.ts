@@ -15,6 +15,7 @@ import * as households from '../services/household.js'
 import { listNotifications, markAllRead } from '../services/notifications.js'
 import { getVerificationQueue } from '../services/verification.js'
 import * as foodPreferences from '../services/foodPreferences.js'
+import { getKitchenRoles, KITCHEN_ROLES, setKitchenRoles } from '../services/kitchenRoles.js'
 import { AGE_GROUPS, ALLERGENS, DIET_TYPES, HEALTH_GOALS, WEEKDAYS } from '../services/foodSafety.js'
 import type { HouseholdRole } from '@prisma/client'
 import { env } from '../config/env.js'
@@ -100,6 +101,19 @@ householdRouter.put('/:householdId/family/:profileId', requireHouseholdMember, a
 householdRouter.delete('/:householdId/family/:profileId', requireHouseholdMember, async (req, res) => {
   await foodPreferences.deleteFamilyProfile(hid(res), String(req.params.profileId))
   res.status(204).end()
+})
+
+const rolesList = z.array(z.enum(KITCHEN_ROLES)).max(KITCHEN_ROLES.length)
+householdRouter.get('/:householdId/roles', requireHouseholdMember, async (_req, res) => {
+  res.json(await getKitchenRoles(hid(res)))
+})
+
+householdRouter.put('/:householdId/roles', requireHouseholdMember, async (req, res) => {
+  const input = z.object({
+    members: z.array(z.object({ userId: z.string().min(1).max(40), roles: rolesList })).max(50).default([]),
+    family: z.array(z.object({ id: z.string().min(1).max(40), roles: rolesList })).max(20).default([]),
+  }).parse(req.body)
+  res.json(await setKitchenRoles(hid(res), (res.locals.user as { id: string }).id, role(res), input))
 })
 
 /** The owner finishes the onboarding cards; from then on the app opens on the dashboard. */

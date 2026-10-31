@@ -83,3 +83,36 @@ describe('kitchen setup', () => {
     assert.ok(rajma.reasons.some((r: any) => r.text === 'Takes 70 min; you usually have 40'))
   })
 })
+
+describe('kitchen roles', () => {
+  it('lets the owner assign jobs to everyone and members change only their own', async () => {
+    const owner = await signUpWithHousehold('Planner')
+    const code = (await owner.api('POST', `/households/${owner.householdId}/invite-code`)).body.inviteCode
+    const member = client()
+    await member('POST', '/auth/register', { name: 'Cook', email: `cook-${Date.now()}@example.com`, password: 'a-long-password' })
+    await member('POST', '/households/join', { code })
+    const ownerId = (await owner.api('GET', '/auth/me')).body.user.id
+    const memberId = (await member('GET', '/auth/me')).body.user.id
+    const dadi = (await owner.api('POST', `/households/${owner.householdId}/family`, { name: 'Dadi' })).body.id
+
+    const set = await owner.api('PUT', `/households/${owner.householdId}/roles`, {
+      members: [{ userId: ownerId, roles: ['PLANNER', 'SHOPPER', 'PLANNER'] }, { userId: memberId, roles: ['STOCK_CHECKER'] }],
+      family: [{ id: dadi, roles: ['COOK'] }],
+    })
+    assert.equal(set.status, 200)
+    assert.deepEqual(set.body.members.map((m: any) => m.roles), [['PLANNER', 'SHOPPER'], ['STOCK_CHECKER']])
+    assert.deepEqual(set.body.family[0].roles, ['COOK'])
+    assert.deepEqual((await member('GET', '/auth/me')).body.household.yourKitchenRoles, ['STOCK_CHECKER'])
+
+    // A member may change their own jobs, but not anyone else's.
+    assert.equal((await member('PUT', `/households/${owner.householdId}/roles`, { members: [{ userId: memberId, roles: ['COOK'] }] })).status, 200)
+    assert.equal((await member('PUT', `/households/${owner.householdId}/roles`, { members: [{ userId: ownerId, roles: [] }] })).status, 403)
+    assert.equal((await member('PUT', `/households/${owner.householdId}/roles`, { family: [{ id: dadi, roles: [] }] })).status, 403)
+
+    // People from elsewhere and unknown jobs are refused.
+    assert.equal((await owner.api('PUT', `/households/${owner.householdId}/roles`, { members: [{ userId: 'someone-else', roles: ['COOK'] }] })).status, 400)
+    assert.equal((await owner.api('PUT', `/households/${owner.householdId}/roles`, { members: [{ userId: ownerId, roles: ['CHEF'] }] })).status, 400)
+    const outsider = await signUpWithHousehold('Outsider')
+    assert.equal((await outsider.api('GET', `/households/${owner.householdId}/roles`)).status, 404)
+  })
+})

@@ -5,6 +5,7 @@ import { useSession } from '../../lib/session'
 import { Badge, Field, Notice, PageHeader, Spinner } from '../../components/ui'
 import { PasswordInput } from '../../components/PasswordInput'
 import { KitchenFields, type KitchenSetup } from '../onboarding/KitchenFields'
+import { RolesEditor } from '../onboarding/RolesEditor'
 
 const TIMEZONES = ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York', 'America/Los_Angeles', 'Australia/Sydney', 'UTC']
 
@@ -64,6 +65,12 @@ export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promi
               ? <button className="secondary-button" onClick={() => run(() => api.post(`/households/${household.id}/invite-code`), 'Invite code created.')}>Create invite code</button>
               : <p className="muted small">Invites are switched off. Ask the household owner for a code.</p>}
         </div>
+      </section>
+
+      <section className="panel">
+        <p className="eyebrow">KITCHEN JOBS</p><h2 className="panel-title">Who does what</h2>
+        <p className="muted small">Each person sees their own jobs first on the dashboard.</p>
+        <RolesEditor householdId={household.id} userId={user.id} owner={owner} onSaved={message => { setNotice(message); void onSessionChange() }} />
       </section>
 
       <ProfileCard name={user.name} email={user.email} hasPassword={user.hasPassword !== false} isDemo={user.isDemo === true} onSaveName={name => run(() => api.patch('/auth/me', { name }), 'Name updated.', true)}

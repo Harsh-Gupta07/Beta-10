@@ -102,6 +102,14 @@ enum AgeGroup {
   SENIOR
 }
 
+/// Everyday kitchen jobs, separate from the OWNER/MEMBER permission role.
+enum KitchenRole {
+  PLANNER
+  COOK
+  SHOPPER
+  STOCK_CHECKER
+}
+
 enum Appliance {
   GAS_STOVE
   INDUCTION
@@ -194,6 +202,8 @@ model HouseholdMember {
   householdId String
   userId      String
   role        HouseholdRole @default(MEMBER)
+  /// Kitchen jobs this person usually does (plan, cook, shop, check stock). Only changes what they see first.
+  kitchenRoles KitchenRole[]  @default([])
   joinedAt    DateTime      @default(now())
   household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -305,6 +315,7 @@ model FamilyProfile {
   allergens   Allergen[] @default([])
   healthGoals String[]   @default([])
   weeklyFasts Weekday[]  @default([])
+  kitchenRoles KitchenRole[] @default([])
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   household   Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)

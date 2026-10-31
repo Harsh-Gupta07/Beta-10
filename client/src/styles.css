@@ -770,3 +770,21 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
 }
 .chip-field > small { display: block; font-size: 12px; line-height: 1.45; margin-top: 6px; }
 .onboarding-card > .person-fields { margin-top: 20px; }
+
+/* ---------- Today for you ---------- */
+.today-for-you { margin-bottom: 16px; }
+.task-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.task-card { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: start; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.task-card:hover { border-color: var(--green); }
+.task-card.urgent { border-color: #e8c9a6; background: #fffaf3; }
+.task-icon { grid-row: span 2; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: var(--mint); color: var(--green); }
+.task-card.urgent .task-icon { background: var(--amber-bg); color: var(--amber); }
+.task-text { display: grid; gap: 3px; font-size: 14px; }
+.task-text small { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.task-action { grid-column: 2; font-size: 12.5px; font-weight: 700; color: var(--green-dark); }
+.role-row { padding: 12px 14px; }
+.roles-editor { display: grid; gap: 10px; }
+.roles-editor .people-list { margin: 0; }
+.role-row > legend { float: left; width: 100%; margin-bottom: 8px; font-size: 14px; color: var(--ink); }
+.role-row > .chip-options { clear: both; margin-top: 0; }
+@media (max-width: 760px) { .step-dots { gap: 8px; } .step-dots li:not(.current) { font-size: 0; gap: 0; } }

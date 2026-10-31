@@ -7,6 +7,7 @@ import { formatDay, formatDelta, formatQuantity, relativeDay, relativeTime, slot
 import { ShortageList } from '../planner/ShortageList'
 import { Badge, EmptyState, Notice, PageHeader, Spinner } from '../../components/ui'
 import { WhatToCookNext } from '../suggestions/WhatToCookNext'
+import { TodayForYou } from './TodayForYou'
 
 export function DashboardPage() {
   const { household, user } = useSession()
@@ -44,6 +45,7 @@ export function DashboardPage() {
         <Link to="/planner"><CalendarDays size={16} aria-hidden />Plan a meal</Link>
       </section>
 
+      <TodayForYou roles={household.yourKitchenRoles ?? []} data={data} />
       <WhatToCookNext />
 
       <section className="content-grid">

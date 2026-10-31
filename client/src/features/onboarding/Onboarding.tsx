@@ -6,15 +6,16 @@ import { Brand } from '../../components/AppShell'
 import { Badge, Notice, Segmented, Spinner } from '../../components/ui'
 import { PersonFields, emptyNeeds } from './PersonFields'
 import { KitchenFields, type KitchenSetup } from './KitchenFields'
+import { RolesEditor } from './RolesEditor'
 
 type Props = { user: User; household: Household | null; onChanged: () => Promise<void>; onSignOut: () => Promise<void> }
 
-const STEPS = ['Your household', 'Who eats at home', 'Your kitchen']
+const STEPS = ['Your household', 'Who eats at home', 'Your kitchen', 'Who does what']
 
-/** First-time setup as short conversational cards. More cards (roles, language) are added in later slices. */
+/** First-time setup as short conversational cards. A language card is added in a later slice. */
 export function Onboarding({ user, household, onChanged, onSignOut }: Props) {
-  const [kitchen, setKitchen] = useState(false)
-  const step = !household ? 1 : kitchen ? 3 : 2
+  const [stage, setStage] = useState<'people' | 'kitchen' | 'roles'>('people')
+  const step = !household ? 1 : stage === 'people' ? 2 : stage === 'kitchen' ? 3 : 4
   async function finish() {
     await api.post(`/households/${household!.id}/onboarding/complete`)
     await onChanged()
@@ -29,8 +30,9 @@ export function Onboarding({ user, household, onChanged, onSignOut }: Props) {
       </ol>
     </header>
     {!household ? <HouseholdStep user={user} onCreated={onChanged} />
-      : kitchen ? <KitchenStep household={household} onBack={() => setKitchen(false)} onFinish={finish} />
-      : <PeopleStep user={user} household={household} onNext={() => setKitchen(true)} />}
+      : stage === 'roles' ? <RolesStep user={user} household={household} onBack={() => setStage('kitchen')} onFinish={finish} />
+      : stage === 'kitchen' ? <KitchenStep household={household} onBack={() => setStage('people')} onNext={() => setStage('roles')} />
+      : <PeopleStep user={user} household={household} onNext={() => setStage('kitchen')} />}
     <p className="switch-auth">Signed in as {user.email}. <button type="button" onClick={() => void onSignOut()}>Sign out</button></p>
   </main>
 }
@@ -76,7 +78,7 @@ function HouseholdStep({ user, onCreated }: { user: User; onCreated: () => Promi
   </section>
 }
 
-function KitchenStep({ household, onBack, onFinish }: { household: Household; onBack: () => void; onFinish: () => Promise<void> }) {
+function KitchenStep({ household, onBack, onNext }: { household: Household; onBack: () => void; onNext: () => void }) {
   const [setup, setSetup] = useState<KitchenSetup>({ appliances: household.appliances ?? [], usualCookMinutes: household.usualCookMinutes ?? null, cuisines: [], defaultServings: household.defaultServings })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -88,7 +90,7 @@ function KitchenStep({ household, onBack, onFinish }: { household: Household; on
         await api.patch(`/households/${household.id}`, { appliances: setup.appliances, usualCookMinutes: setup.usualCookMinutes, defaultServings: setup.defaultServings })
         if (setup.cuisines.length) await api.put(`/households/${household.id}/food-profile`, { cuisines: setup.cuisines })
       }
-      await onFinish()
+      onNext()
     } catch (err) { setError(errorMessage(err, 'Could not save your kitchen.')); setBusy(false) }
   }
 
@@ -101,8 +103,29 @@ function KitchenStep({ household, onBack, onFinish }: { household: Household; on
     <div className="onboarding-actions">
       <button type="button" className="ghost-button" onClick={onBack} disabled={busy}>Back</button>
       <span className="toolbar-spacer" />
-      <button type="button" className="ghost-button" onClick={() => done(false)} disabled={busy}>Skip for now</button>
-      <button type="button" className="primary-button" onClick={() => done(true)} disabled={busy}>{busy ? 'Finishing…' : 'Finish setup'}</button>
+      <button type="button" className="ghost-button" onClick={() => done(false)} disabled={busy}>Skip this step</button>
+      <button type="button" className="primary-button" onClick={() => done(true)} disabled={busy}>{busy ? 'Saving…' : 'Next: who does what'}</button>
+    </div>
+  </section>
+}
+
+function RolesStep({ user, household, onBack, onFinish }: { user: User; household: Household; onBack: () => void; onFinish: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function finish() {
+    setBusy(true); setError('')
+    try { await onFinish() } catch (err) { setError(errorMessage(err)); setBusy(false) }
+  }
+  return <section className="onboarding-card wide">
+    <p className="eyebrow">STEP 4</p>
+    <h1>Who does what in your kitchen?</h1>
+    <p className="muted">Each person then sees their own jobs first: the cook sees today’s meals, the shopper the list, the checker the stock check. Everyone can still use everything.</p>
+    {error && <Notice>{error}</Notice>}
+    <RolesEditor householdId={household.id} userId={user.id} owner saveLabel={busy ? 'Finishing…' : 'Save and finish setup'} onSaved={finish} />
+    <div className="onboarding-actions">
+      <button type="button" className="ghost-button" onClick={onBack} disabled={busy}>Back</button>
+      <span className="toolbar-spacer" />
+      <button type="button" className="ghost-button" onClick={finish} disabled={busy}>Skip for now</button>
     </div>
   </section>
 }
