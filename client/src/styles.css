@@ -816,3 +816,15 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
   .staples-actions { flex-direction: column-reverse; align-items: stretch; }
   .staples-actions .primary-button { margin-left: 0; }
 }
+
+/* Touch screens: every control gets a hit area of at least 44px, the size a fingertip needs.
+   Mouse layouts keep their compact sizes. The check box keeps its look and grows an invisible margin. */
+@media (pointer: coarse) {
+  .icon-button, .stepper .icon-button { width: 44px; height: 44px; }
+  .chip-options .toggle-chip { min-height: 44px; height: auto; }
+  .small-button { min-height: 40px; }
+  .link-button { min-height: 44px; padding: 0 4px; }
+  .mobile-nav a { min-height: 48px; align-content: center; }
+  .check-button { position: relative; width: 26px; height: 26px; }
+  .check-button::after { content: ''; position: absolute; inset: -9px; }
+}

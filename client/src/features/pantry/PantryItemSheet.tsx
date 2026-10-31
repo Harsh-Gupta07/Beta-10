@@ -84,7 +84,7 @@ export function PantryItemSheet({ item, onClose, onChanged, onDeleted, onEdit }:
       <div className="action-row">
         <button className="choice-button" disabled={busy} onClick={() => void verify({ action: 'confirm' })}><Check size={16} aria-hidden />Quantity is correct</button>
         <button className={`choice-button ${mode === 'update' ? 'active' : ''}`} disabled={busy} onClick={() => openMode(mode === 'update' ? 'idle' : 'update')}><PencilLine size={16} aria-hidden />Update quantity</button>
-        <button className="choice-button" disabled={busy || item.status === 'OUT'} onClick={() => void verify({ action: 'finished' })}><CircleOff size={16} aria-hidden />Mark as finished</button>
+        <button className="choice-button" disabled={busy || item.status === 'OUT'} onClick={() => window.confirm(`Mark ${item.ingredient.name} as finished? Its stock goes to zero.`) && void verify({ action: 'finished' })}><CircleOff size={16} aria-hidden />Mark as finished</button>
         <button className={`choice-button ${mode === 'use' ? 'active' : ''}`} disabled={busy || item.status === 'OUT'} onClick={() => openMode(mode === 'use' ? 'idle' : 'use')}><Minus size={16} aria-hidden />Record use</button>
       </div>
       {mode === 'update' && <form className="inline-form" onSubmit={submitUpdate}>

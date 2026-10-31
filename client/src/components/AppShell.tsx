@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, BookOpen, CalendarDays, ClipboardCheck, Heart, House, LayoutDashboard, Lightbulb, LogOut, Menu, Refrigerator, Settings, ShoppingCart, Sparkles, Sprout, X, type LucideIcon } from 'lucide-react'
 import { api, type AppNotification } from '../lib/api'
 import { useSession } from '../lib/session'
 import { relativeTime } from '../lib/format'
+import { trapTab } from './ui'
 
 type NavItem = { to: string; label: string; short: string; icon: LucideIcon }
 
@@ -37,6 +38,16 @@ export function Brand() {
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, household, signOut } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
+  const menu = useRef<HTMLDivElement>(null)
+  // The phone menu behaves like a dialog: focus moves in, Tab stays inside, Escape closes it.
+  useEffect(() => {
+    if (!menuOpen) return
+    const previous = document.activeElement as HTMLElement | null
+    menu.current?.querySelector<HTMLElement>('button')?.focus()
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false); else trapTab(event, menu.current) }
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('keydown', onKey); previous?.focus() }
+  }, [menuOpen])
   const account = <div className="account"><span className="avatar" aria-hidden>{user.name[0]?.toUpperCase()}</span><span className="account-text"><strong>{user.name}</strong><small>{user.email}</small></span><button className="icon-button" onClick={() => void signOut()} aria-label="Sign out" title="Sign out"><LogOut size={16} /></button></div>
 
   return <div className="app-shell">
@@ -53,7 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <span className="mobile-top-actions"><NotificationBell /><button className="icon-button" onClick={() => setMenuOpen(true)} aria-label="Open menu" aria-expanded={menuOpen}><Menu size={20} /></button></span>
     </header>
     {menuOpen && <div className="mobile-menu-backdrop" onClick={() => setMenuOpen(false)}>
-      <div className="mobile-menu" onClick={event => event.stopPropagation()} role="dialog" aria-label="Menu">
+      <div ref={menu} className="mobile-menu" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Menu">
         <div className="mobile-menu-head"><p className="household-chip"><House size={14} aria-hidden />{household.name}</p><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Close menu"><X size={18} /></button></div>
         <NavLinks onNavigate={() => setMenuOpen(false)} />
         {account}
@@ -78,6 +89,16 @@ function NotificationBell() {
   const navigate = useNavigate()
   const [data, setData] = useState<{ unread: number; items: AppNotification[] }>({ unread: 0, items: [] })
   const [open, setOpen] = useState(false)
+  const bell = useRef<HTMLDivElement>(null)
+  // Escape or a tap anywhere outside closes the panel.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    const onDown = (event: MouseEvent) => { if (!bell.current?.contains(event.target as Node)) setOpen(false) }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onDown)
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown) }
+  }, [open])
   useEffect(() => {
     api.get(`/households/${household.id}/notifications`).then(r => setData(r.data)).catch(() => undefined)
   }, [household.id, location.pathname])
@@ -89,7 +110,7 @@ function NotificationBell() {
       setData(prev => ({ ...prev, unread: 0 }))
     }
   }
-  return <div className="bell">
+  return <div ref={bell} className="bell">
     <button className="icon-button" onClick={toggle} aria-label={`Notifications${data.unread ? `, ${data.unread} unread` : ''}`} aria-expanded={open}>
       <Bell size={18} />{data.unread > 0 && <span className="bell-count">{data.unread}</span>}
     </button>

@@ -31,7 +31,8 @@ export function VerifyPage() {
       setOutcomes(prev => ({ ...prev, [entry.item.id]: data.affected
         ? { tone: 'warning', text: `${text} Planned meals are now short ${formatQuantity(data.affected.shortage, data.affected.unit)}, starting with ${data.affected.firstAffected.recipeName} (${slotLabel[data.affected.firstAffected.slot].toLowerCase()}, ${data.affected.firstAffected.date}).`, link: '/shopping' }
         : { tone: 'success', text: `${text} Plans and shortages are up to date.` } }))
-    } catch (err) { setOutcomes(prev => ({ ...prev, [entry.item.id]: { tone: 'warning', text: errorMessage(err) } })) }
+    // A failed save stays on the list so it can be tried again; the card shows why.
+    } catch (err) { throw new Error(errorMessage(err, `${name} couldn’t be saved. Please try again.`)) }
   }
 
   const pending = queue?.filter(e => !outcomes[e.item.id]) ?? []
@@ -64,7 +65,11 @@ function VerifyCard({ entry, onVerify }: { entry: VerificationEntry; onVerify: (
   const [quantity, setQuantity] = useState('')
   const [unit, setUnit] = useState<InputUnit>(baseUnit[item.unit])
   const [busy, setBusy] = useState(false)
-  const go = async (body: object) => { setBusy(true); await onVerify(body); setBusy(false) }
+  const [failure, setFailure] = useState('')
+  const go = async (body: object) => {
+    setBusy(true); setFailure('')
+    try { await onVerify(body) } catch (err) { setFailure((err as Error).message) } finally { setBusy(false) }
+  }
   const submit = (event: FormEvent) => { event.preventDefault(); void go({ action: 'update', quantity, unit }) }
   return <article className="verify-card">
     <div className="verify-head">
@@ -73,10 +78,11 @@ function VerifyCard({ entry, onVerify }: { entry: VerificationEntry; onVerify: (
     </div>
     <StockBadges item={item} />
     <ul className="reason-list">{entry.reasons.map(r => <li key={r}>{r}</li>)}</ul>
+    {failure && <Notice>{failure}</Notice>}
     <div className="action-row three">
       <button className="choice-button" disabled={busy} onClick={() => go({ action: 'confirm' })}><Check size={16} aria-hidden />Quantity is correct</button>
       <button className={`choice-button ${updating ? 'active' : ''}`} disabled={busy} onClick={() => setUpdating(!updating)}><PencilLine size={16} aria-hidden />Update quantity</button>
-      <button className="choice-button" disabled={busy} onClick={() => go({ action: 'finished' })}><CircleOff size={16} aria-hidden />Mark as finished</button>
+      <button className="choice-button" disabled={busy} onClick={() => window.confirm(`Mark ${item.ingredient.name} as finished? Its stock goes to zero.`) && go({ action: 'finished' })}><CircleOff size={16} aria-hidden />Mark as finished</button>
     </div>
     {updating && <form className="inline-form" onSubmit={submit}>
       <span className="quantity-input"><input value={quantity} onChange={e => setQuantity(e.target.value)} inputMode="decimal" pattern="\d+(\.\d+)?" required placeholder="Actual amount" aria-label="Actual amount" autoFocus />

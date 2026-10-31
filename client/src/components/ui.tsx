@@ -33,7 +33,20 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
   </div>
 }
 
-/** Accessible dialog: traps initial focus, closes on Escape and backdrop click, and becomes a bottom sheet on phones. */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** Keeps Tab and Shift+Tab cycling inside `container`, so keyboard users can't wander behind a dialog. */
+export function trapTab(event: KeyboardEvent, container: HTMLElement | null) {
+  if (event.key !== 'Tab' || !container) return
+  const items = [...container.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(item => item.offsetParent !== null)
+  if (!items.length) return
+  const first = items[0]!, last = items[items.length - 1]!
+  const inside = container.contains(document.activeElement)
+  if (event.shiftKey && (document.activeElement === first || !inside)) { event.preventDefault(); last.focus() }
+  else if (!event.shiftKey && (document.activeElement === last || !inside)) { event.preventDefault(); first.focus() }
+}
+
+/** Accessible dialog: moves focus in and keeps Tab inside, closes on Escape and backdrop click, and becomes a bottom sheet on phones. */
 export function Modal({ title, subtitle, onClose, children, footer, wide }: { title: string; subtitle?: ReactNode; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const titleId = useId()
   const panel = useRef<HTMLDivElement>(null)
@@ -41,7 +54,7 @@ export function Modal({ title, subtitle, onClose, children, footer, wide }: { ti
     const previous = document.activeElement as HTMLElement | null
     const first = panel.current?.querySelector<HTMLElement>('input, select, textarea, button:not(.modal-close)')
     ;(first ?? panel.current)?.focus()
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); else trapTab(event, panel.current) }
     document.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; previous?.focus() }

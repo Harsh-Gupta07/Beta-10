@@ -220,7 +220,7 @@ Set these in the hosting platform's secret store. Do not upload a `.env` file.
 ```bash
 npm ci                    # exact versions from package-lock.json (needs dev dependencies for the build)
 npm run build:deploy      # prisma generate + compile server + build client (client/dist)
-npm run db:deploy         # prisma migrate deploy: applies the 5 committed migrations, never resets data
+npm run db:deploy         # prisma migrate deploy: applies any committed migrations not yet applied, never resets data
 npm run db:seed:prod      # ingredient catalog + 15 recipes (idempotent; safe on every deploy)
 npm start                 # node server/dist/src/index.js
 ```

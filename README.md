@@ -4,7 +4,7 @@ KitchenSync is a household kitchen assistant for planning meals, tracking what i
 
 You plan meals for the week. KitchenSync reserves the ingredients those meals need from your pantry, warns you early about anything you'll run short of, builds your shopping list, and updates your stock when you actually cook or receive groceries.
 
-Phase 1 MVP status: all 10 modules work, and 47 automated tests pass.
+Status: Phase 1, Phase 2 (food preferences, What to Cook) and onboarding are built, and 113 automated tests pass.
 
 ## Contents
 
@@ -31,7 +31,7 @@ Phase 1 MVP status: all 10 modules work, and 47 automated tests pass.
 
 ## Quick start
 
-You need **Node.js 20+**, **PostgreSQL 15+**, and optionally a **Google Gemini API key** for the AI assistant.
+You need **Node.js 22.19+**, **PostgreSQL 15+**, and optionally a **Google Gemini API key** for the AI assistant.
 
 ```bash
 git clone https://github.com/Harsh-Gupta07/Beta-10.git
@@ -86,7 +86,7 @@ If an old `server/.env` has an empty `GOOGLE_CLIENT_ID=` line, that's fine: the 
 
 ## User guide
 
-The menu (sidebar on desktop, bottom bar and ☰ menu on mobile) has seven sections: **Dashboard, Meal Planner, Recipes, Pantry, Shopping List, AI Assistant, Household & Settings.**
+The menu (sidebar on desktop, bottom bar and ☰ menu on mobile) has ten sections: **Dashboard, What to Cook, Meal Planner, Recipes, Pantry, Shopping List, Quick Stock Check, Kitchen Assistant, Food Preferences, Household & Settings.**
 
 ### 1. Create your account and household
 
@@ -324,7 +324,7 @@ The free tier allows only a few requests per minute, and one question can take 2
 
 ### Tests
 
-`npm test` runs 89 tests against a real PostgreSQL database: unit conversion and scaling, the allocation engine (including the brief's rice example), food safety and preferences, eating history and suggestions, release hardening, pantry, recipes, planner, cooking (double and simultaneous completion), shopping (partial delivery, double receipt), verification and notifications, invites and permissions, the assistant's offline mode, and the brief's full integration journey (`server/src/routes/journey.test.ts`).
+`npm test` runs 113 tests against a real PostgreSQL database: unit conversion and scaling, the allocation engine (including the brief's rice example), food safety and preferences, eating history and suggestions, release hardening (origin checks and rate limits, including sign-in spraying and demo assistant use), sign-in and demo kitchens, pantry, recipes, planner, cooking (double and simultaneous completion), shopping (partial delivery, double receipt), verification and notifications, invites and permissions, the assistant's offline mode, and the brief's full integration journey (`server/src/routes/journey.test.ts`).
 
 1. Create a test database: `CREATE DATABASE kitchensync_test OWNER kitchensync;`
 2. Set `TEST_DATABASE_URL` in `server/.env`. Its name must contain `test`.

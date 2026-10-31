@@ -85,17 +85,17 @@ export function ShoppingPage() {
                 <button className="check-button" aria-label={`Mark ${item.name} as purchased`} onClick={() => run(() => api.patch(`${base}/items/${item.id}`, { status: 'PURCHASED' }))} />
                 <ItemText item={item} />
                 <button className="secondary-button small-button" onClick={() => setReceiving(item)}><PackageCheck size={14} aria-hidden />Received</button>
-                <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => run(() => api.delete(`${base}/items/${item.id}`))}><Trash2 size={15} /></button>
+                <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => window.confirm(`Remove ${item.name} from the list?`) && run(() => api.delete(`${base}/items/${item.id}`))}><Trash2 size={15} /></button>
               </>} />
             {groups.purchased.length > 0 && <ItemGroup title="Purchased, waiting to arrive" items={groups.purchased}
               render={item => <>
                 <button className="check-button checked" aria-label={`Mark ${item.name} as not purchased`} onClick={() => run(() => api.patch(`${base}/items/${item.id}`, { status: 'NEEDED' }))}><Check size={13} /></button>
                 <ItemText item={item} />
                 <button className="primary-button small-button" onClick={() => setReceiving(item)}><PackageCheck size={14} aria-hidden />Confirm received</button>
-                <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => run(() => api.delete(`${base}/items/${item.id}`))}><Trash2 size={15} /></button>
+                <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => window.confirm(`Remove ${item.name} from the list?`) && run(() => api.delete(`${base}/items/${item.id}`))}><Trash2 size={15} /></button>
               </>} />}
             {groups.received.length > 0 && <ItemGroup title="Received into pantry" items={groups.received}
-              action={<button className="link-button" onClick={() => run(() => api.post(`${base}/clear-received`), 'Cleared received items. Stock history is kept.')}>Clear</button>}
+              action={<button className="link-button" onClick={() => window.confirm('Clear received items from the list? Your pantry and stock history stay as they are.') && run(() => api.post(`${base}/clear-received`), 'Cleared received items. Stock history is kept.')}>Clear</button>}
               render={item => <>
                 <span className="check-button done"><Check size={13} /></span>
                 <span className="item-text"><strong>{item.name}</strong><small>Received {itemQty(item, item.receivedQty ?? item.quantity)}{item.receivedQty && item.receivedQty !== item.quantity ? ` of ${itemQty(item)}` : ''}</small></span>

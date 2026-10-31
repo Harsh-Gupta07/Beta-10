@@ -65,7 +65,7 @@ export function AssistantPage() {
   return <div className="assistant-page">
     <PageHeader eyebrow="AI ASSISTANT" title="Kitchen assistant" description="Ask in plain language. Numbers come from your real pantry, recipes and plan, and nothing changes until you confirm."
       actions={status && <Badge tone={status.configured ? 'green' : 'grey'}>{status.configured ? 'AI connected' : 'Offline mode'}</Badge>} />
-    {status && !status.configured && <Notice tone="warning">The AI isn’t configured, so answers come from a simple offline mode. Add <code>AI_API_KEY</code> to <code>server/.env</code> to enable it.</Notice>}
+    {status && !status.configured && <Notice tone="warning">The AI assistant isn’t switched on yet, so you’ll get simpler built-in answers. Everything else in KitchenSync works as usual.</Notice>}
 
     <section className="chat panel" aria-live="polite">
       {!messages.length && <div className="chat-empty">

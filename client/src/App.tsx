@@ -1,9 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { api, errorMessage, type Household, type User } from './lib/api'
 import { SessionContext, type Session } from './lib/session'
 import { AppShell } from './components/AppShell'
 import { Spinner } from './components/ui'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthScreen } from './features/auth/AuthScreen'
 import { Onboarding } from './features/onboarding/Onboarding'
 import { DashboardPage } from './features/dashboard/DashboardPage'
@@ -41,6 +42,18 @@ function App() {
 
   useEffect(() => { void refresh() }, [refresh])
 
+  // A session that ends while the app is open (expired, signed out elsewhere, demo over) returns to sign-in
+  // instead of every page showing "Please sign in to continue."
+  const signedIn = user !== null
+  useEffect(() => {
+    if (!signedIn) return
+    const id = api.interceptors.response.use(undefined, error => {
+      if (error?.response?.status === 401 && !String(error.config?.url ?? '').startsWith('/auth/')) void refresh()
+      return Promise.reject(error)
+    })
+    return () => api.interceptors.response.eject(id)
+  }, [signedIn, refresh])
+
   const signOut = useCallback(async () => {
     try { await api.post('/auth/logout') } finally { setUser(null); setHousehold(null) }
   }, [])
@@ -54,6 +67,7 @@ function App() {
 
   return <SessionContext.Provider value={session}>
     <AppShell>
+      <PageBoundary>
       <Suspense fallback={<Spinner label="Loading…" />}>
       <Routes>
         <Route path="/" element={<DashboardPage />} />
@@ -70,8 +84,13 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
+      </PageBoundary>
     </AppShell>
   </SessionContext.Provider>
+}
+
+function PageBoundary({ children }: { children: ReactNode }) {
+  return <ErrorBoundary resetKey={useLocation().pathname}>{children}</ErrorBoundary>
 }
 
 export default App
