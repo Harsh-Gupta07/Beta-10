@@ -22,6 +22,7 @@ export function PlannerPage() {
   const [showAllShortages, setShowAllShortages] = useState(false)
   const [cookingMealId, setCookingMealId] = useState<string | null>(null)
   const [shoppingNote, setShoppingNote] = useState('')
+  const [resolvedShortages, setResolvedShortages] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     setError('')
@@ -71,7 +72,12 @@ export function PlannerPage() {
         ? <section className="panel shortage-panel">
             <div className="panel-heading"><div><p className="eyebrow">UPCOMING SHORTAGES</p><h2><TriangleAlert size={17} aria-hidden className="inline-icon warn" />{data.shortages.length} ingredient{data.shortages.length === 1 ? '' : 's'} will run short</h2></div>
               {data.shortages.length > 4 && <button className="link-button" onClick={() => setShowAllShortages(!showAllShortages)}>{showAllShortages ? 'Show fewer' : `Show all ${data.shortages.length}`}</button>}</div>
-            <ShortageList shortages={data.shortages} today={data.today} limit={showAllShortages ? undefined : 4} onSelectMeal={selectMeal} />
+            <ShortageList shortages={data.shortages.filter(s => !resolvedShortages.has(s.ingredient.id))} today={data.today} limit={showAllShortages ? undefined : 4} onSelectMeal={selectMeal}
+              onResolve={ingredientId => setResolvedShortages(current => new Set(current).add(ingredientId))}
+              onReject={async ingredientId => {
+                try { const { data: result } = await api.post<{ added: number }>(`/households/${household.id}/shopping/add-shortages`, { ingredientIds: [ingredientId] }); setShoppingNote(result.added ? 'Rejected shortage moved to your shopping cart.' : 'That shortage is already in your cart.'); setResolvedShortages(current => new Set(current).add(ingredientId)) }
+                catch (err) { setShoppingNote(errorMessage(err)) }
+              }} />
             <div className="panel-actions">
               <button className="secondary-button" onClick={async () => {
                 try { const { data } = await api.post<{ added: number }>(`/households/${household.id}/shopping/add-shortages`, {}); setShoppingNote(data.added ? `Added ${data.added} item${data.added === 1 ? '' : 's'} to your shopping list.` : 'Everything short is already on your shopping list.') }

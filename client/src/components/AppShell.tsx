@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, BookOpen, CalendarDays, ClipboardCheck, Heart, House, LayoutDashboard, Lightbulb, LogOut, Menu, Refrigerator, Settings, ShoppingCart, Sparkles, Sprout, X, type LucideIcon } from 'lucide-react'
+import { Bell, BookOpen, CalendarDays, ClipboardCheck, Dumbbell, Heart, House, LayoutDashboard, Lightbulb, LogOut, Menu, Refrigerator, Settings, ShoppingCart, Sparkles, Sprout, X, type LucideIcon } from 'lucide-react'
 import { api, type AppNotification } from '../lib/api'
 import { useSession } from '../lib/session'
 import { relativeTime } from '../lib/format'
@@ -18,6 +18,7 @@ export const navItems: NavItem[] = [
   { to: '/verify', label: 'Quick Stock Check', short: 'Check', icon: ClipboardCheck },
   { to: '/assistant', label: 'Kitchen Assistant', short: 'Assistant', icon: Sparkles },
   { to: '/preferences', label: 'Food Preferences', short: 'Prefs', icon: Heart },
+  { to: '/fit', label: 'KitchenSync Fit', short: 'Fit', icon: Dumbbell },
   { to: '/settings', label: 'Household & Settings', short: 'Settings', icon: Settings },
 ]
 

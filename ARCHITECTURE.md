@@ -1,5 +1,11 @@
 # KitchenSync Phase 1 — Architecture
 
+## Nutrition and Fitness module
+
+`NutritionProfile` is private to its user. `IngredientNutrition` is the deterministic source for recipe totals, while `RecipeNutrition` caches versioned calculations. `MealLog` drives daily progress. `FoodScan` stores only a private image reference and a proposal/confirmation audit trail; AI or mock providers may propose data but confirmation services perform all Decimal calculations and inventory writes. `SubscriptionEntitlement` is enforced by API middleware. The development-only entitlement toggle is unavailable when `NODE_ENV=production`.
+
+The product flow is: profile goal → versioned targets → deterministic pantry ranking → scan proposal → user confirmation → meal log or idempotent stock receipt → recalculated daily progress.
+
 ## Product and first release
 
 KitchenSync coordinates a household's pantry, planned meals, ingredient needs, shopping, and actual consumption. Its primary workflow is **Plan → Allocate → Detect shortages → Shop → Cook → Deduct → Verify**. The core value is reliable stock and recovery when the recorded stock is wrong; recipe discovery and AI support that workflow.

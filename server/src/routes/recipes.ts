@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { INPUT_UNITS } from '../services/units.js'
 import * as recipes from '../services/recipes.js'
+import * as nutrition from '../services/nutrition.js'
 
 // Mounted under /households/:householdId, after requireUser + requireHouseholdMember.
 export const recipeRouter = Router({ mergeParams: true })
@@ -38,6 +39,13 @@ recipeRouter.get('/recipes', async (req, res) => {
 recipeRouter.get('/recipes/:recipeId', async (req, res) => {
   const { servings } = z.object({ servings: z.coerce.number().int().min(1).max(50).optional() }).parse(req.query)
   res.json(await recipes.getRecipe(householdId(res), recipeId(req.params), servings))
+})
+
+recipeRouter.get('/recipes/:recipeId/nutrition', async (req, res) => {
+  const { servings } = z.object({ servings: z.coerce.number().int().min(1).max(50).optional() }).parse(req.query)
+  // getRecipe enforces that the recipe is shared or belongs to this household.
+  await recipes.getRecipe(householdId(res), recipeId(req.params), servings)
+  res.json(await nutrition.recipeNutrition(recipeId(req.params), servings))
 })
 
 recipeRouter.post('/recipes', async (req, res) => {

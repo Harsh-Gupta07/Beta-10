@@ -816,7 +816,6 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
   .staples-actions { flex-direction: column-reverse; align-items: stretch; }
   .staples-actions .primary-button { margin-left: 0; }
 }
-
 /* Touch screens: every control gets a hit area of at least 44px, the size a fingertip needs.
    Mouse layouts keep their compact sizes. The check box keeps its look and grows an invisible margin. */
 @media (pointer: coarse) {
@@ -828,3 +827,5 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; 
   .check-button { position: relative; width: 26px; height: 26px; }
   .check-button::after { content: ''; position: absolute; inset: -9px; }
 }
+.fit-page{max-width:1180px;margin:auto}.fit-hero{display:flex;align-items:center;gap:28px;padding:28px}.calorie-ring{width:150px;aspect-ratio:1;border-radius:50%;display:grid;place-content:center;text-align:center;background:conic-gradient(var(--green,#406b4c) var(--progress),#eee7d9 0);position:relative}.calorie-ring:after{content:"";position:absolute;inset:12px;border-radius:50%;background:#fffaf0}.calorie-ring>*{position:relative;z-index:1}.calorie-ring strong{font-size:30px}.calorie-ring span{font-size:12px}.macro-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0}.macro-grid .card{display:grid;gap:8px}.macro-grid progress{width:100%;accent-color:#52785b}.fit-actions{display:flex;gap:10px;margin:18px 0}.fit-actions .button{display:flex;gap:8px;align-items:center}.fit-recs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.fit-recs article ul{padding-left:18px;min-height:68px}.locked-card{display:flex;gap:18px;align-items:center}.fit-profile{max-width:800px;margin:auto;display:grid;gap:18px}.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.check-row{display:flex;gap:10px;align-items:flex-start}.scan-review{position:fixed;right:24px;bottom:24px;z-index:20;width:min(480px,calc(100vw - 32px));max-height:80vh;overflow:auto;box-shadow:0 18px 60px #2f392c35}.scan-item{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #ece4d6}.row-between{display:flex;justify-content:space-between;gap:12px;align-items:center}.section-title{margin-top:28px}@media(max-width:760px){.fit-hero{align-items:flex-start;padding:18px}.calorie-ring{width:112px}.macro-grid,.fit-recs,.form-grid{grid-template-columns:1fr}.fit-actions{position:sticky;bottom:72px;z-index:5;background:#fffaf0;padding:8px 0}.fit-actions .button{flex:1}.scan-review{right:16px;bottom:76px}.fit-recs article ul{min-height:0}}
+.shortage-decisions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.shortage-decisions button{min-height:36px}

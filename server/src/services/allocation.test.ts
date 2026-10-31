@@ -12,6 +12,17 @@ const str = (line: { required: Prisma.Decimal; allocated: Prisma.Decimal; shorta
   line && [line.required.toString(), line.allocated.toString(), line.shortage.toString()]
 
 describe('allocate', () => {
+  it('adds repeated daily shortfalls instead of reporting only the first meal', () => {
+    const result = allocate(new Map([['spinach', D(0)]]), [
+      meal('today', '2026-11-01', 'DINNER', [['spinach', 10]]),
+      meal('tomorrow', '2026-11-02', 'DINNER', [['spinach', 10]]),
+    ])
+    const position = result.byIngredient.get('spinach')!
+    assert.equal(position.required.toString(), '20')
+    assert.equal(position.shortage.toString(), '20')
+    assert.deepEqual(position.shortMealIds, ['today', 'tomorrow'])
+  })
+
   it('reserves stock earliest meal first and reports the shortage (spec rice example)', () => {
     const meals = [meal('mon', '2026-03-02', 'LUNCH', [['rice', 300]]), meal('tue', '2026-03-03', 'LUNCH', [['rice', 400]]), meal('wed', '2026-03-04', 'LUNCH', [['rice', 500]])]
     const result = allocate(new Map([['rice', D(1000)]]), meals)

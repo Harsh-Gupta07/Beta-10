@@ -210,7 +210,7 @@ class AiUnavailable extends Error {
 }
 
 async function callGemini(model: string, contents: Content[], system: string): Promise<Content> {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+  const response = await fetch(`${env.AI_API_BASE_URL}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': env.AI_API_KEY! },
     body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, tools: [{ functionDeclarations: toolDeclarations }], generationConfig: { temperature: 0.4 } }),
