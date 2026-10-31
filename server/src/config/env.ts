@@ -5,6 +5,8 @@ const bool = (fallback: boolean) => z.enum(['true', 'false']).default(fallback ?
 const limit = (fallback: number) => z.coerce.number().int().positive().default(fallback)
 
 const PLACEHOLDER_SECRET = 'replace-with-a-long-random-secret-at-least-32-characters'
+/** KitchenSync team's Google OAuth Web client ID. Public by design; only the origins listed in Google Cloud Console may use it. */
+const TEAM_GOOGLE_CLIENT_ID = '1070549791591-q7m3po6rhvhu4n3r3vvpee1drd4lpci6.apps.googleusercontent.com'
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -34,8 +36,11 @@ const schema = z.object({
   AI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
   /** Tried once when the main model is overloaded, rate-limited or slow. */
   AI_FALLBACK_MODEL: z.string().trim().min(1).default('gemini-flash-lite-latest'),
-  /** OAuth Web client ID from Google Cloud Console. Public, not a secret. Empty hides "Continue with Google". */
-  GOOGLE_CLIENT_ID: z.string().trim().optional(),
+  /**
+   * OAuth Web client ID from Google Cloud Console. It is public (every sign-in page shows it), so the team's ID is the
+   * default and a fresh clone works without editing .env. Set another ID to use your own project, or "off" to hide the button.
+   */
+  GOOGLE_CLIENT_ID: z.string().trim().optional().transform(value => value === 'off' ? undefined : value || TEAM_GOOGLE_CLIENT_ID),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV === 'production' && value.SESSION_SECRET === PLACEHOLDER_SECRET) {
     ctx.addIssue({ code: 'custom', path: ['SESSION_SECRET'], message: 'Set a real random SESSION_SECRET in production.' })

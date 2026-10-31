@@ -23,6 +23,8 @@ services:
         value: "true"
       - key: CLIENT_ORIGIN
         value: https://kitchensync-beta-10.onrender.com
+      - key: GOOGLE_CLIENT_ID
+        value: 1070549791591-q7m3po6rhvhu4n3r3vvpee1drd4lpci6.apps.googleusercontent.com
       - key: AI_API_KEY
         sync: false
       - key: AI_MODEL

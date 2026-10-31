@@ -70,6 +70,16 @@ Keep the terminal open while using the app. Press `Ctrl+C` to stop it, and run `
 
 **After pulling new changes** from GitHub, always run `npm install`, `npm run db:migrate` and `npm run db:seed` before `npm run dev`.
 
+### Continue with Google
+
+It works out of the box: the team's Google Client ID is built in (it is public, not a secret). Three things to know:
+
+1. **Open exactly `http://localhost:5173`.** Google only allows the addresses registered for the Client ID. `127.0.0.1`, your LAN IP (e.g. a phone on Wi-Fi) or another port are refused until they are added. The dev server will not silently move to another port; if 5173 is busy it stops with an error, so close the other app using it.
+2. **Testing mode:** while the Google app is in *Testing*, only Gmail accounts listed as **test users** can sign in. The project owner adds them in Google Cloud Console → *Google Auth Platform → Audience → Test users*.
+3. **New addresses** (your Render URL, a LAN IP): the project owner adds them in Google Cloud Console → *Credentials → the Web client → Authorised JavaScript origins*.
+
+If an old `server/.env` has an empty `GOOGLE_CLIENT_ID=` line, that's fine: the built-in ID is used. Set it to `off` to hide the button.
+
 ---
 
 ## User guide
