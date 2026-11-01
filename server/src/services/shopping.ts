@@ -69,6 +69,19 @@ async function addItemTx(tx: Tx, householdId: string, input: AddItemInput) {
   return tx.shoppingListItem.create({ data: { shoppingListId, name, quantity: quantity.toDecimalPlaces(3), unit: input.unit?.trim() || 'item', source: input.source ?? 'MANUAL', note: input.note ?? '' }, include: itemInclude })
 }
 
+export async function addScannedItemsTx(tx: Tx, householdId: string, items: Array<{ ingredientId?: string; name?: string; quantity: number; unit: string }>) {
+  const added = []
+  for (const item of items) {
+    added.push(await addItemTx(tx, householdId, {
+      ...item,
+      unit: item.ingredientId && item.unit === 'count' ? 'pcs' : item.unit,
+      source: 'ASSISTANT',
+      note: 'Added from confirmed grocery scan',
+    }))
+  }
+  return added.map(serialize)
+}
+
 export async function addItem(householdId: string, input: AddItemInput) {
   return serialize(await prisma.$transaction(tx => addItemTx(tx, householdId, input)))
 }

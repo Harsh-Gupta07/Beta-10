@@ -9,7 +9,7 @@ import { FamilyManager } from '../onboarding/FamilyManager'
 type Option = { id: string; name: string }
 const splitList = (value: string) => [...new Set(value.split(',').map(v => v.trim()).filter(Boolean))]
 
-export function FoodPreferencesPage() {
+export function FoodPreferencesPage({ embedded = false }: { embedded?: boolean }) {
   const { household, user } = useSession()
   const [mine, setMine] = useState<FoodPreferences | null>(null)
   const [shared, setShared] = useState<HouseholdFoodProfile | null>(null)
@@ -41,7 +41,7 @@ export function FoodPreferencesPage() {
   }
 
   return <>
-    <PageHeader eyebrow="FOOD PREFERENCES" title="What everyone eats" description="Allergies and diets are firm rules: dishes that clash are marked on every recipe. Likes and dislikes only guide suggestions." />
+    {!embedded && <PageHeader eyebrow="FOOD PREFERENCES" title="What everyone eats" description="Allergies and diets are firm rules: dishes that clash are marked on every recipe. Likes and dislikes only guide suggestions." />}
     {error && <Notice onRetry={load}>{error}</Notice>}
     {notice && <Notice tone="success">{notice}</Notice>}
     {!mine && !error && <Spinner label="Loading preferences…" />}

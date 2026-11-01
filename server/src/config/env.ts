@@ -39,6 +39,8 @@ const schema = z.object({
   AI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
   /** Tried once when the main model is overloaded, rate-limited or slow. */
   AI_FALLBACK_MODEL: z.string().trim().min(1).default('gemini-flash-lite-latest'),
+  /** Gemini model used with Google Search grounding through the Interactions API. */
+  AI_SEARCH_MODEL: z.string().trim().min(1).default('gemini-3.8-flash'),
   /** Multimodal model used only for food-photo proposals. */
   AI_VISION_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
   /**

@@ -20,6 +20,11 @@ describe('nutrition targets', () => {
     const result = calculateTargets({ ageYears: 80, biologicalSex: 'FEMALE', heightCm: 145, weightKg: 40, activityLevel: 'SEDENTARY', goal: 'FAT_LOSS' })
     assert.equal(result.calorieTarget, 1200)
   })
+
+  it('uses body weight and activity for general protein instead of age', () => {
+    const result = calculateTargets({ ageYears: 45, biologicalSex: 'FEMALE', heightCm: 165, weightKg: 60, activityLevel: 'SEDENTARY', goal: 'BALANCED' })
+    assert.equal(result.proteinTargetG.toString(), '48')
+  })
 })
 
 describe('recipe nutrition', () => {

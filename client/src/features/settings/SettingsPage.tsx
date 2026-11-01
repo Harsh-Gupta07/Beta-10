@@ -11,7 +11,7 @@ import { DEFAULT_MEASURES } from '../../lib/measures'
 
 const TIMEZONES = ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York', 'America/Los_Angeles', 'Australia/Sydney', 'UTC']
 
-export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promise<void> }) {
+export function SettingsPage({ onSessionChange, embedded = false }: { onSessionChange: () => Promise<void>; embedded?: boolean }) {
   const { household, user, signOut } = useSession()
   const [details, setDetails] = useState<HouseholdDetails | null>(null)
   const [ai, setAi] = useState<{ configured: boolean; model: string | null } | null>(null)
@@ -35,7 +35,7 @@ export function SettingsPage({ onSessionChange }: { onSessionChange: () => Promi
 
   const owner = details?.yourRole === 'OWNER'
   return <>
-    <PageHeader eyebrow="SETTINGS" title="Household & settings" description="Everyone in a household shares the same pantry, recipes, plan and shopping list." />
+    {!embedded && <PageHeader eyebrow="SETTINGS" title="Household & settings" description="Everyone in a household shares the same pantry, recipes, plan and shopping list." />}
     {error && <Notice onRetry={load}>{error}</Notice>}
     {notice && <Notice tone="success">{notice}</Notice>}
     {!details && !error && <Spinner label="Loading settings…" />}

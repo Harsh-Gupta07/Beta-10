@@ -161,6 +161,19 @@ enum MealLogSource {
   PHOTO
 }
 
+enum NutritionMealSlot {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+enum DietPlanStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
 enum FoodScanType {
   COOKED_MEAL
   GROCERY
@@ -224,6 +237,7 @@ model User {
   mealLogs         MealLog[]
   foodScans        FoodScan[]
   entitlement      SubscriptionEntitlement?
+  dietPlans        DietPlan[]
 }
 
 model Household {
@@ -261,6 +275,7 @@ model Household {
   foodProfile           HouseholdFoodProfile?
   eatenLogs             EatenLog[]
   snoozes               RecommendationSnooze[]
+  dietPlans             DietPlan[]
 }
 
 model HouseholdMember {
@@ -533,24 +548,42 @@ model RecipeNutrition {
 }
 
 model MealLog {
-  id            String        @id @default(cuid())
-  userId        String
-  plannedMealId String?
-  recipeId      String?
-  mealSlot      MealSlot
-  servings      Decimal       @db.Decimal(6, 2)
-  source        MealLogSource
-  calories      Decimal       @db.Decimal(10, 3)
-  proteinG      Decimal       @db.Decimal(10, 3)
-  carbsG        Decimal       @db.Decimal(10, 3)
-  fatG          Decimal       @db.Decimal(10, 3)
-  fibreG        Decimal       @db.Decimal(10, 3)
-  loggedAt      DateTime      @default(now())
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plannedMeal   PlannedMeal?  @relation(fields: [plannedMealId], references: [id], onDelete: SetNull)
-  recipe        Recipe?       @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  id             String            @id @default(cuid())
+  userId         String
+  plannedMealId  String?
+  recipeId       String?
+  mealSlot       NutritionMealSlot
+  servings       Decimal           @db.Decimal(6, 2)
+  source         MealLogSource
+  calories       Decimal           @db.Decimal(10, 3)
+  proteinG       Decimal           @db.Decimal(10, 3)
+  carbsG         Decimal           @db.Decimal(10, 3)
+  fatG           Decimal           @db.Decimal(10, 3)
+  fibreG         Decimal           @db.Decimal(10, 3)
+  loggedAt       DateTime          @default(now())
+  idempotencyKey String?           @unique
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plannedMeal    PlannedMeal?      @relation(fields: [plannedMealId], references: [id], onDelete: SetNull)
+  recipe         Recipe?           @relation(fields: [recipeId], references: [id], onDelete: SetNull)
 
+  @@unique([plannedMealId, userId])
   @@index([userId, loggedAt])
+}
+
+model DietPlan {
+  id          String         @id @default(cuid())
+  userId      String
+  householdId String
+  weekStart   DateTime       @db.Date
+  status      DietPlanStatus @default(DRAFT)
+  proposal    Json
+  confirmedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household   Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([userId, weekStart])
 }
 
 model FoodScan {

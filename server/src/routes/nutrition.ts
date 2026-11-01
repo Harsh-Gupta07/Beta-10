@@ -23,6 +23,7 @@ nutritionRouter.get('/profile', async (_req, res) => res.json({ profile: await n
 nutritionRouter.put('/profile', async (req, res) => res.json(await nutrition.saveProfile(userId(res), profileInput.parse(req.body))))
 nutritionRouter.delete('/profile', async (_req, res) => { await nutrition.deleteProfile(userId(res)); res.status(204).end() })
 nutritionRouter.get('/today', async (_req, res) => res.json(await nutrition.today(userId(res))))
+nutritionRouter.get('/history', async (req, res) => { const { days } = z.object({ days: z.coerce.number().int().min(1).max(30).default(7) }).parse(req.query); res.json(await nutrition.history(userId(res), days)) })
 nutritionRouter.get('/entitlement', async (_req, res) => res.json(await entitlementFor(userId(res))))
 nutritionRouter.put('/entitlement/demo', async (req, res) => {
   if (env.NODE_ENV === 'production') return res.status(404).json({ error: 'Route not found.' })

@@ -16,10 +16,17 @@ scansRouter.post('/:id/cancel', async (req, res) => { await scans.cancelScan(uid
 scansRouter.post('/:id/confirm', async (req, res) => {
   const id = String(req.params.id); const scan = await scans.getScan(uid(res), id)
   if (scan.scanType === 'GROCERY') {
-    const { items } = z.object({ items: z.array(z.object({ ingredientId: z.string().min(1), quantity: z.number().positive().max(100000) })).min(1).max(50) }).parse(req.body)
-    return res.json(await scans.confirmGrocery(uid(res), id, items))
+    const input = z.object({
+      destination: z.enum(['PANTRY', 'SHOPPING_LIST']).default('PANTRY'),
+      items: z.array(z.object({
+        ingredientId: z.string().min(1).optional(),
+        name: z.string().trim().min(1).max(100).optional(),
+        quantity: z.number().positive().max(100000),
+        unit: z.enum(['g', 'ml', 'count']),
+      }).refine(item => item.ingredientId || item.name, 'Choose an ingredient or provide an item name.')).min(1).max(50),
+    }).parse(req.body)
+    return res.json(await scans.confirmGrocery(uid(res), id, input.items, input.destination))
   }
   const input = z.object({ recipeId: z.string().min(1), servings: z.number().positive().max(20), mealSlot: z.enum(['BREAKFAST', 'LUNCH', 'DINNER']) }).parse(req.body)
   res.json(await scans.confirmMeal(uid(res), id, input))
 })
-

@@ -6,7 +6,8 @@ import { useSession } from '../../lib/session'
 import { Badge, Notice, PageHeader } from '../../components/ui'
 import { RecipeForm } from '../recipes/RecipeForm'
 
-type Message = { id: string; role: 'user' | 'assistant'; text: string; mode?: 'ai' | 'fallback'; actions?: AssistantAction[] }
+type Message = { id: string; role: 'user' | 'assistant'; text: string; mode?: 'ai' | 'fallback'; googleSearch?: AssistantReply['googleSearch']; sources?: AssistantReply['sources']; actions?: AssistantAction[] }
+type AssistantStatus = { configured: boolean; model: string | null; searchModel: string | null }
 type ActionState = 'pending' | 'busy' | 'done' | 'dismissed'
 
 const SUGGESTIONS = ['What can I cook today?', 'Suggest dinner using potatoes and paneer.', 'Add two packets of milk to my inventory.', 'How much rice do I need for five people?', 'Why is my dinner showing a shortage?']
@@ -14,7 +15,7 @@ const SUGGESTIONS = ['What can I cook today?', 'Suggest dinner using potatoes an
 export function AssistantPage() {
   const { household } = useSession()
   const navigate = useNavigate()
-  const [status, setStatus] = useState<{ configured: boolean; model: string | null } | null>(null)
+  const [status, setStatus] = useState<AssistantStatus | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -24,7 +25,7 @@ export function AssistantPage() {
   const [draft, setDraft] = useState<{ actionId: string; recipe: RecipeDraft } | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { api.get(`/households/${household.id}/assistant`).then(r => setStatus(r.data)).catch(() => setStatus({ configured: false, model: null })) }, [household.id])
+  useEffect(() => { api.get<AssistantStatus>(`/households/${household.id}/assistant`).then(r => setStatus(r.data)).catch(() => setStatus({ configured: false, model: null, searchModel: null })) }, [household.id])
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [messages, busy])
 
   async function send(text: string) {
@@ -36,7 +37,7 @@ export function AssistantPage() {
     setBusy(true)
     try {
       const { data } = await api.post<AssistantReply>(`/households/${household.id}/assistant/messages`, { message, history })
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: data.reply, mode: data.mode, actions: data.actions }])
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: data.reply, mode: data.mode, googleSearch: data.googleSearch, sources: data.sources, actions: data.actions }])
     } catch (err) { setError(errorMessage(err, 'The assistant could not answer.')) }
     finally { setBusy(false) }
   }
@@ -63,8 +64,8 @@ export function AssistantPage() {
   const submit = (event: FormEvent) => { event.preventDefault(); void send(input) }
 
   return <div className="assistant-page">
-    <PageHeader eyebrow="AI ASSISTANT" title="Kitchen assistant" description="Ask in plain language. Numbers come from your real pantry, recipes and plan, and nothing changes until you confirm."
-      actions={status && <Badge tone={status.configured ? 'green' : 'grey'}>{status.configured ? 'AI connected' : 'Offline mode'}</Badge>} />
+    <PageHeader eyebrow="AI ASSISTANT" title="Kitchen assistant" description="Ask in plain language. Gemini can search Google for current answers and show its sources. Kitchen facts come from your real pantry, recipes and plan, and nothing changes until you confirm."
+      actions={status && <Badge tone={status.configured ? 'green' : 'grey'}>{status.configured ? 'Google AI configured' : 'Offline mode'}</Badge>} />
     {status && !status.configured && <Notice tone="warning">The AI assistant isn’t switched on yet, so you’ll get simpler built-in answers. Everything else in KitchenSync works as usual.</Notice>}
 
     <section className="chat panel" aria-live="polite">
@@ -77,7 +78,16 @@ export function AssistantPage() {
       {messages.map(m => <div key={m.id} className={`bubble-row ${m.role}`}>
         <div className={`bubble ${m.role}`}>
           {m.role === 'assistant' && m.mode === 'fallback' && <Badge tone="grey">Offline answer</Badge>}
+          {m.role === 'assistant' && m.googleSearch === 'grounded' && <Badge tone="green">Google Search grounded</Badge>}
+          {m.role === 'assistant' && m.googleSearch === 'uncited' && <Badge tone="amber">Google Search returned no citations</Badge>}
+          {m.role === 'assistant' && m.googleSearch === 'not-used' && <Badge tone="grey">Google Search not used</Badge>}
+          {m.role === 'assistant' && m.googleSearch === 'unavailable' && <Badge tone="amber">Google Search unavailable</Badge>}
+          {m.role === 'assistant' && m.googleSearch === 'not-configured' && <Badge tone="grey">Google Search not configured</Badge>}
           <FormattedText text={m.text} />
+          {!!m.sources?.length && <div className="assistant-sources">
+            <strong>Sources</strong>
+            <ul>{m.sources.map(source => <li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a></li>)}</ul>
+          </div>}
           {m.actions?.map(action => {
             const state = actionState[action.id] ?? 'pending'
             if (state === 'dismissed') return null

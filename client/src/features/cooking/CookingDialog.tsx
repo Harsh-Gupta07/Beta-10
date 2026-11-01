@@ -4,6 +4,7 @@ import { api, errorMessage, type CookingView, type InputUnit } from '../../lib/a
 import { useSession } from '../../lib/session'
 import { baseUnit, formatDay, formatQuantity, slotLabel, unitOptions } from '../../lib/format'
 import { Badge, Modal, Notice, Spinner } from '../../components/ui'
+import { RecipePhoto } from '../recipes/RecipePhoto'
 
 type Props = { mealId: string; onClose: () => void; onChanged: () => void }
 
@@ -64,6 +65,7 @@ export function CookingDialog({ mealId, onClose, onChanged }: Props) {
     </Notice>}
 
     {view && <>
+      <RecipePhoto name={view.recipe.name} variant="hero" showSource />
       <section className="sheet-section">
         <h3>{done ? 'What was used' : 'Confirm what you actually used'}</h3>
         {!done && <p className="muted small">Adjust any amount that differed from the recipe. Set it to 0 for anything you skipped. Stock is deducted once, when you mark the meal as cooked.</p>}

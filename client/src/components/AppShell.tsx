@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, BookOpen, CalendarDays, ClipboardCheck, Dumbbell, Heart, House, LayoutDashboard, Lightbulb, LogOut, Menu, Refrigerator, Settings, ShoppingCart, Sparkles, Sprout, X, type LucideIcon } from 'lucide-react'
+import { Bell, BookOpen, CalendarDays, Dumbbell, Heart, House, LayoutDashboard, Lightbulb, LogOut, Menu, Refrigerator, Settings, ShoppingCart, Sparkles, Sprout, UsersRound, X, type LucideIcon } from 'lucide-react'
 import { api, type AppNotification } from '../lib/api'
 import { useSession } from '../lib/session'
 import { relativeTime } from '../lib/format'
@@ -15,11 +15,9 @@ export const navItems: NavItem[] = [
   { to: '/recipes', label: 'Recipes', short: 'Recipes', icon: BookOpen },
   { to: '/pantry', label: 'Pantry', short: 'Pantry', icon: Refrigerator },
   { to: '/shopping', label: 'Shopping List', short: 'Shop', icon: ShoppingCart },
-  { to: '/verify', label: 'Quick Stock Check', short: 'Check', icon: ClipboardCheck },
+  { to: '/guest-mode', label: 'Guest Mode', short: 'Guests', icon: UsersRound },
   { to: '/assistant', label: 'Kitchen Assistant', short: 'Assistant', icon: Sparkles },
-  { to: '/preferences', label: 'Food Preferences', short: 'Prefs', icon: Heart },
   { to: '/fit', label: 'KitchenSync Fit', short: 'Fit', icon: Dumbbell },
-  { to: '/settings', label: 'Household & Settings', short: 'Settings', icon: Settings },
 ]
 
 const mobileTabs = navItems.filter(item => ['/', '/planner', '/pantry', '/shopping', '/assistant'].includes(item.to))
@@ -49,7 +47,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('keydown', onKey); previous?.focus() }
   }, [menuOpen])
-  const account = <div className="account"><span className="avatar" aria-hidden>{user.name[0]?.toUpperCase()}</span><span className="account-text"><strong>{user.name}</strong><small>{user.email}</small></span><button className="icon-button" onClick={() => void signOut()} aria-label="Sign out" title="Sign out"><LogOut size={16} /></button></div>
+  const account = (onNavigate?: () => void) => <div className="account">
+    <div className="account-main"><span className="avatar" aria-hidden>{user.name[0]?.toUpperCase()}</span><span className="account-text"><strong>{user.name}</strong><small>{user.email}</small></span><button className="icon-button" onClick={() => void signOut()} aria-label="Sign out" title="Sign out"><LogOut size={16} /></button></div>
+    <nav className="account-links" aria-label="Account settings">
+      <NavLink to="/settings" onClick={onNavigate} className={({ isActive }) => isActive ? 'active' : ''}><Settings size={15} aria-hidden /><span>Household & settings</span></NavLink>
+      <NavLink to="/preferences" onClick={onNavigate} className={({ isActive }) => isActive ? 'active' : ''}><Heart size={15} aria-hidden /><span>Food preferences</span></NavLink>
+    </nav>
+  </div>
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -57,7 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <p className="brand-promise">Plan meals around what is actually at home.</p>
       <div className="sidebar-row"><p className="household-chip"><House size={14} aria-hidden />{household.name}</p><NotificationBell /></div>
       <NavLinks />
-      {account}
+      {account()}
     </aside>
 
     <header className="mobile-top">
@@ -68,7 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div ref={menu} className="mobile-menu" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Menu">
         <div className="mobile-menu-head"><p className="household-chip"><House size={14} aria-hidden />{household.name}</p><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Close menu"><X size={18} /></button></div>
         <NavLinks onNavigate={() => setMenuOpen(false)} />
-        {account}
+        {account(() => setMenuOpen(false))}
       </div>
     </div>}
 

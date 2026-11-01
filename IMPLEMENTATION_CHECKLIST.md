@@ -15,6 +15,9 @@ Only work that has automated or manual verification is checked.
 - [ ] Fitness profile creates versioned calorie and macro targets
 - [ ] Pantry-aware nutrition recommendations with explanations and safety filters
 - [ ] Manual meal logging and daily progress
+- [ ] Idempotent per-member planned-meal consumption with individual portions
+- [ ] Snack logging and meal timeline
+- [ ] Seven-day nutrition progress
 - [ ] Cooked-meal scan proposal, review and idempotent confirmation
 - [ ] Grocery scan proposal, review and idempotent stock receipt
 - [ ] Pantry remains unchanged before scan confirmation

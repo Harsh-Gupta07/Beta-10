@@ -60,10 +60,24 @@ export async function today(userId: string, now = new Date()) {
   const profile = await prisma.nutritionProfile.findUnique({ where: { userId } })
   const start = new Date(now); start.setHours(0, 0, 0, 0)
   const end = new Date(start); end.setDate(end.getDate() + 1)
-  const logs = await prisma.mealLog.findMany({ where: { userId, loggedAt: { gte: start, lt: end } }, orderBy: { loggedAt: 'asc' } })
+  const logs = await prisma.mealLog.findMany({ where: { userId, loggedAt: { gte: start, lt: end } }, include: { recipe: { select: { id: true, name: true } } }, orderBy: { loggedAt: 'asc' } })
   const consumed = logs.reduce((sum, log) => ({ calories: sum.calories.plus(log.calories), proteinG: sum.proteinG.plus(log.proteinG), carbsG: sum.carbsG.plus(log.carbsG), fatG: sum.fatG.plus(log.fatG) }), { calories: new Prisma.Decimal(0), proteinG: new Prisma.Decimal(0), carbsG: new Prisma.Decimal(0), fatG: new Prisma.Decimal(0) })
   const targets = profile ? { calories: new Prisma.Decimal(profile.calorieTarget), proteinG: profile.proteinTargetG, carbsG: profile.carbsTargetG, fatG: profile.fatTargetG } : null
   const serial = (v: Record<string, Prisma.Decimal>) => Object.fromEntries(Object.entries(v).map(([k, n]) => [k, n.toDecimalPlaces(2).toString()]))
-  return { date: start.toISOString().slice(0, 10), profile: profile ? profileOutput(profile) : null, consumed: serial(consumed), remaining: targets ? serial(Object.fromEntries(Object.entries(targets).map(([k, n]) => [k, Prisma.Decimal.max(n.minus(consumed[k as keyof typeof consumed]), 0)]))) : null, logs: logs.map(log => ({ ...log, servings: log.servings.toString(), calories: log.calories.toString(), proteinG: log.proteinG.toString(), carbsG: log.carbsG.toString(), fatG: log.fatG.toString(), fibreG: log.fibreG.toString() })) }
+  const membership = await prisma.householdMember.findFirst({ where: { userId }, select: { householdId: true } })
+  const plannedMeals = membership ? await prisma.plannedMeal.findMany({ where: { mealPlan: { householdId: membership.householdId }, date: start, status: { in: ['PLANNED', 'COOKING', 'COMPLETED'] } }, include: { recipe: { select: { id: true, name: true } } }, orderBy: { slot: 'asc' } }) : []
+  const plannedRows = await Promise.all(plannedMeals.map(async meal => ({ id: meal.id, slot: meal.slot, recipe: meal.recipe, nutrition: await recipeNutrition(meal.recipe.id, 1), consumed: logs.some(log => log.plannedMealId === meal.id) })))
+  const planned = plannedRows.filter(row => !row.consumed).reduce((sum, row) => ({ calories: sum.calories.plus(row.nutrition.calories), proteinG: sum.proteinG.plus(row.nutrition.proteinG), carbsG: sum.carbsG.plus(row.nutrition.carbsG), fatG: sum.fatG.plus(row.nutrition.fatG) }), { calories: new Prisma.Decimal(0), proteinG: new Prisma.Decimal(0), carbsG: new Prisma.Decimal(0), fatG: new Prisma.Decimal(0) })
+  return { date: start.toISOString().slice(0, 10), profile: profile ? profileOutput(profile) : null, consumed: serial(consumed), planned: serial(planned), remaining: targets ? serial(Object.fromEntries(Object.entries(targets).map(([k, n]) => [k, Prisma.Decimal.max(n.minus(consumed[k as keyof typeof consumed]), 0)]))) : null, timeline: { planned: plannedRows, consumed: logs.map(log => ({ ...log, servings: log.servings.toString(), calories: log.calories.toString(), proteinG: log.proteinG.toString(), carbsG: log.carbsG.toString(), fatG: log.fatG.toString(), fibreG: log.fibreG.toString() })) } }
+}
+
+export async function history(userId: string, days = 7, now = new Date()) {
+  const end = new Date(now); end.setHours(23, 59, 59, 999)
+  const start = new Date(end); start.setDate(start.getDate() - days + 1); start.setHours(0, 0, 0, 0)
+  const logs = await prisma.mealLog.findMany({ where: { userId, loggedAt: { gte: start, lte: end } }, orderBy: { loggedAt: 'asc' } })
+  const byDate = new Map<string, { calories: Prisma.Decimal; proteinG: Prisma.Decimal; carbsG: Prisma.Decimal; fatG: Prisma.Decimal }>()
+  for (let i = 0; i < days; i++) { const d = new Date(start); d.setDate(d.getDate() + i); byDate.set(d.toISOString().slice(0, 10), { calories: new Prisma.Decimal(0), proteinG: new Prisma.Decimal(0), carbsG: new Prisma.Decimal(0), fatG: new Prisma.Decimal(0) }) }
+  for (const log of logs) { const key = log.loggedAt.toISOString().slice(0, 10); const row = byDate.get(key); if (row) { row.calories = row.calories.plus(log.calories); row.proteinG = row.proteinG.plus(log.proteinG); row.carbsG = row.carbsG.plus(log.carbsG); row.fatG = row.fatG.plus(log.fatG) } }
+  return { days: [...byDate].map(([date, values]) => ({ date, ...Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value.toDecimalPlaces(2).toString()])) })) }
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Camera, Leaf } from 'lucide-react'
 
 type CommonsPhoto = {
@@ -75,23 +75,42 @@ function photoScore(title: string, query: string) {
 }
 
 export function RecipePhoto({ name, variant = 'card', showSource = false }: { name: string; variant?: 'card' | 'hero' | 'thumb'; showSource?: boolean }) {
+  const element = useRef<HTMLElement>(null)
   const [photo, setPhoto] = useState<CommonsPhoto | null | undefined>(() => memory.get(name))
   const [failed, setFailed] = useState(false)
+  const [nearViewport, setNearViewport] = useState(false)
 
   useEffect(() => {
-    if (photo !== undefined) return
+    const node = element.current
+    if (!node || nearViewport) return
+    if (typeof IntersectionObserver === 'undefined') {
+      setNearViewport(true)
+      return
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) {
+        setNearViewport(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '200px' })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [nearViewport])
+
+  useEffect(() => {
+    if (!nearViewport || photo !== undefined) return
     const controller = new AbortController()
     findPhoto(name, controller.signal).then(setPhoto).catch(error => {
       if (error.name !== 'AbortError') setPhoto(null)
     })
     return () => controller.abort()
-  }, [name, photo])
+  }, [name, photo, nearViewport])
 
   const showImage = photo && !failed
-  return <figure className={`recipe-photo ${variant} ${showImage ? 'has-image' : ''}`} aria-label={`${name} photo`}>
+  return <figure ref={element} className={`recipe-photo ${variant} ${showImage ? 'has-image' : ''}`} aria-label={`${name} photo`}>
     {showImage
       ? <img src={photo.imageUrl} alt={photo.title} loading="lazy" onError={() => setFailed(true)} />
-      : <div className="recipe-photo-fallback"><Leaf size={variant === 'hero' ? 30 : 22} aria-hidden /><span>{photo === undefined ? 'Finding a matching photo' : name}</span></div>}
+      : <div className="recipe-photo-fallback"><Leaf size={variant === 'hero' ? 30 : 22} aria-hidden /><span>{photo === undefined ? nearViewport ? 'Finding a matching photo' : name : name}</span></div>}
     {showImage && showSource && <a className="photo-source" href={photo.sourceUrl} target="_blank" rel="noreferrer" title={`Photo: ${photo.credit}`} aria-label={`Photo source for ${name}: ${photo.credit}`}>
       <Camera size={13} aria-hidden /><span>Photo source</span>
     </a>}

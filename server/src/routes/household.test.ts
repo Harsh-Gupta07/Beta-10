@@ -93,10 +93,12 @@ describe('household settings, members and invites', () => {
 describe('assistant', () => {
   it('falls back to deterministic answers when AI is not configured', async () => {
     const { api, householdId } = await signUpWithHousehold('Chatter', 4)
-    assert.deepEqual((await api('GET', `/households/${householdId}/assistant`)).body, { configured: false, model: null, fallbackModel: null })
+    assert.deepEqual((await api('GET', `/households/${householdId}/assistant`)).body, { configured: false, model: null, fallbackModel: null, searchModel: null })
     const reply = await api('POST', `/households/${householdId}/assistant/messages`, { message: 'What can I cook today?', history: [] })
     assert.equal(reply.status, 200)
     assert.equal(reply.body.mode, 'fallback')
+    assert.equal(reply.body.googleSearch, 'not-configured')
+    assert.deepEqual(reply.body.sources, [])
     assert.match(reply.body.reply, /isn’t set up yet/)
     assert.match(reply.body.reply, /Closest options|You can cook/)
   })

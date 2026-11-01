@@ -36,6 +36,7 @@ export function PlannerPage() {
     api.get<{ recipes: RecipeSummary[] }>(`/households/${household.id}/recipes`).then(r => setRecipes(r.data.recipes)).catch(() => setRecipes([]))
   }, [household.id])
 
+  const isCurrentWeek = data ? data.today >= data.weekStart && data.today <= data.weekEnd : true
   const days = useMemo(() => data ? Array.from({ length: 7 }, (_, i) => addDays(data.weekStart, i)) : [], [data])
   const mealAt = useMemo(() => {
     const map = new Map<string, PlannedMeal>()
@@ -52,7 +53,6 @@ export function PlannerPage() {
     setOpenMealId(mealId)
   }
 
-  const isCurrentWeek = data ? data.today >= data.weekStart && data.today <= data.weekEnd : true
   const planned = data?.meals.filter(m => m.status !== 'CANCELLED').length ?? 0
 
   return <>
@@ -68,6 +68,31 @@ export function PlannerPage() {
     {!data && !error && <Spinner label="Loading meal plan…" />}
 
     {data && <>
+      <section className="planner-grid" aria-label="Week plan">
+        {days.map(day => {
+          const past = day < data.today
+          return <div key={day} className={`planner-day ${day === data.today ? 'today' : ''} ${past ? 'past' : ''}`}>
+            <h2 className="day-head"><span>{formatDay(day).split(' ')[0]}</span><strong>{formatDay(day).split(' ').slice(1).join(' ')}</strong>{day === data.today && <Badge tone="green">Today</Badge>}</h2>
+            {slots.map(slot => {
+              const meal = mealAt.get(`${day}|${slot}`)
+              const canAdd = !past && (!meal || meal.status === 'CANCELLED')
+              return <div key={slot} className="slot">
+              <span className="slot-label">{slotLabel[slot]}</span>
+              {meal && <button className={`meal-chip status-${meal.status.toLowerCase()} ${meal.shortCount ? 'has-short' : ''}`} onClick={() => setOpenMealId(meal.id)}>
+                <strong>{meal.recipe.name}</strong>
+                  <span className="chip-meta">{meal.servings} servings
+                    {meal.status !== 'PLANNED' && <> · {statusLabel[meal.status]}</>}
+                    {meal.reservesStock && meal.shortCount > 0 && <span className="chip-short">· {meal.shortCount} short</span>}
+                  </span>
+                </button>}
+                {canAdd && <button className="add-slot" onClick={() => setAdding({ date: day, slot })} aria-label={`Plan ${slotLabel[slot]} on ${formatDay(day)}`}><Plus size={14} aria-hidden />{meal ? 'Plan another' : 'Add'}</button>}
+                {!meal && past && <span className="slot-empty">Not planned</span>}
+              </div>
+            })}
+          </div>
+        })}
+      </section>
+
       {data.shortages.length > 0
         ? <section className="panel shortage-panel">
             <div className="panel-heading"><div><p className="eyebrow">UPCOMING SHORTAGES</p><h2><TriangleAlert size={17} aria-hidden className="inline-icon warn" />{data.shortages.length} ingredient{data.shortages.length === 1 ? '' : 's'} will run short</h2></div>
@@ -87,31 +112,6 @@ export function PlannerPage() {
             </div>
           </section>
         : planned > 0 && <div className="callout success"><CalendarCheck size={18} aria-hidden /><span>Your pantry covers every upcoming planned meal.</span></div>}
-
-      <section className="planner-grid" aria-label="Week plan">
-        {days.map(day => {
-          const past = day < data.today
-          return <div key={day} className={`planner-day ${day === data.today ? 'today' : ''} ${past ? 'past' : ''}`}>
-            <h2 className="day-head"><span>{formatDay(day).split(' ')[0]}</span><strong>{formatDay(day).split(' ').slice(1).join(' ')}</strong>{day === data.today && <Badge tone="green">Today</Badge>}</h2>
-            {slots.map(slot => {
-              const meal = mealAt.get(`${day}|${slot}`)
-              const canAdd = !past && (!meal || meal.status === 'CANCELLED')
-              return <div key={slot} className="slot">
-                <span className="slot-label">{slotLabel[slot]}</span>
-                {meal && <button className={`meal-chip status-${meal.status.toLowerCase()} ${meal.shortCount ? 'has-short' : ''}`} onClick={() => setOpenMealId(meal.id)}>
-                  <strong>{meal.recipe.name}</strong>
-                  <span className="chip-meta">{meal.servings} servings
-                    {meal.status !== 'PLANNED' && <> · {statusLabel[meal.status]}</>}
-                    {meal.reservesStock && meal.shortCount > 0 && <span className="chip-short">· {meal.shortCount} short</span>}
-                  </span>
-                </button>}
-                {canAdd && <button className="add-slot" onClick={() => setAdding({ date: day, slot })} aria-label={`Plan ${slotLabel[slot]} on ${formatDay(day)}`}><Plus size={14} aria-hidden />{meal ? 'Plan another' : 'Add'}</button>}
-                {!meal && past && <span className="slot-empty">Not planned</span>}
-              </div>
-            })}
-          </div>
-        })}
-      </section>
     </>}
 
     {adding && data && <AddMealDialog date={adding.date} slot={adding.slot} recipes={recipes} defaultServings={data.defaultServings} onClose={() => setAdding(null)} onAdded={() => { setAdding(null); void load() }} />}

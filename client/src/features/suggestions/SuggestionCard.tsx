@@ -6,6 +6,7 @@ import { useSession } from '../../lib/session'
 import { slotLabel, slots } from '../../lib/format'
 import { Badge, Field, Modal, Notice } from '../../components/ui'
 import { DietBadge, SafetyBadge } from '../recipes/RecipeSafety'
+import { RecipePhoto } from '../recipes/RecipePhoto'
 import { ServingsStepper } from '../planner/AddMealDialog'
 
 export type MyDishPrefs = { favourite: Set<string>; disliked: Set<string> }
@@ -35,6 +36,9 @@ export function SuggestionCard({ suggestion, prefs, compact, onChanged, defaultS
   const setPref = (kind: 'FAVOURITE' | 'DISLIKE' | null, message: string) => act(() => api.put(`/me/recipe-prefs/${recipe.id}`, { kind }), message)
 
   return <article className={`suggestion-card ${compact ? 'compact' : ''}`}>
+    <Link to={`/recipes/${recipe.id}`} className="suggestion-photo-link" aria-label={`View ${recipe.name}`}>
+      <RecipePhoto name={recipe.name} showSource />
+    </Link>
     <div className="suggestion-head">
       <div>
         <Link to={`/recipes/${recipe.id}`} className="suggestion-name">{recipe.name}</Link>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, BookOpen, Boxes, CalendarCheck, CalendarDays, ChefHat, ChevronRight, ClipboardCheck, PackageCheck, Plus, ShoppingCart, Sparkles, TriangleAlert } from 'lucide-react'
+import { Activity, ArrowUpRight, BookOpen, Boxes, CalendarCheck, CalendarDays, ChefHat, ChevronRight, ClipboardCheck, PackageCheck, Plus, ShoppingCart, Sparkles, TriangleAlert } from 'lucide-react'
 import { api, errorMessage, type Dashboard } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatDay, formatDelta, formatQuantity, relativeDay, relativeTime, slotLabel, statusLabel, transactionLabel } from '../../lib/format'
@@ -8,6 +8,7 @@ import { ShortageList } from '../planner/ShortageList'
 import { Badge, EmptyState, Notice, PageHeader, Spinner } from '../../components/ui'
 import { WhatToCookNext } from '../suggestions/WhatToCookNext'
 import { TodayForYou } from './TodayForYou'
+import { RecipePhoto } from '../recipes/RecipePhoto'
 
 export function DashboardPage() {
   const { household, user } = useSession()
@@ -53,14 +54,14 @@ export function DashboardPage() {
           <div className="panel-heading"><div><p className="eyebrow">UP NEXT</p><h2>Today’s meals</h2></div><Link to="/planner">Open planner</Link></div>
           {data.todayMeals.length
             ? <div className="meal-list">{data.todayMeals.map(meal => <Link to="/planner" className="meal-row" key={meal.id}>
-                <span className="meal-time">{slotLabel[meal.slot]}</span><strong>{meal.recipe.name}</strong>
+                <span className="meal-time">{slotLabel[meal.slot]}</span><RecipePhoto name={meal.recipe.name} variant="thumb" /><strong>{meal.recipe.name}</strong>
                 <span>{meal.status !== 'PLANNED' ? statusLabel[meal.status] : meal.shortCount ? <Badge tone="red">{meal.shortCount} short</Badge> : `${meal.servings} servings`}</span>
               </Link>)}</div>
             : <EmptyState icon={CalendarDays} title="No meals planned for today" action={<Link className="secondary-button" to="/planner">Plan a meal</Link>}>Plan a meal and KitchenSync reserves the stock it needs and warns you about shortages.</EmptyState>}
           {data.upcomingMeals.length > 0 && <>
             <p className="eyebrow sub-eyebrow">COMING UP</p>
             <ul className="compact-list">{data.upcomingMeals.map(meal => <li key={meal.id}>
-              <span>{meal.recipe.name}</span>
+              <span className="compact-recipe"><RecipePhoto name={meal.recipe.name} variant="thumb" />{meal.recipe.name}</span>
               <span className="compact-meta">{relativeDay(meal.date, data.today)} · {slotLabel[meal.slot].toLowerCase()}</span>
               {meal.shortCount > 0 && <Badge tone="red">{meal.shortCount} short</Badge>}
             </li>)}</ul>
@@ -126,5 +127,6 @@ function JourneyBar({ shortages, shopping, needsCheck }: { shortages: number; sh
 
 function Stat({ label, value, note, to, tone }: { label: string; value: number; note: string; to?: string; tone?: 'amber' }) {
   const body = <><span>{label}</span><strong className={tone}>{value}</strong><small>{note}</small></>
-  return to ? <Link className="stat-card link" to={to}>{body}</Link> : <article className="stat-card">{body}</article>
+  const arrow = <ArrowUpRight className="stat-card-arrow" size={17} aria-hidden />
+  return to ? <Link className="stat-card link" to={to}>{body}{arrow}</Link> : <article className="stat-card">{body}</article>
 }

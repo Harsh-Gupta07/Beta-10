@@ -98,6 +98,12 @@ All routes below are implemented. Household routes are prefixed `/api/v1/househo
 
 ## Risks and controls
 
+## Fitness and consumption boundaries
+
+Fitness profiles and macro logs are user-owned rather than household-readable. `GET /nutrition/today` separates planned, consumed and remaining values. `POST /households/:id/meals/:mealId/consume` records each household member's serving with a unique planned-meal/user key, so retries cannot double count and consumption never invokes pantry deduction. Cooking remains the only stock-deduction transition.
+
+Diet-plan previews are private drafts. AI can only order recipe IDs already filtered for household safety; exact nutrition, allergy checks and final confirmation are server-side. A deterministic pantry/protein ranking is used when AI is unavailable.
+
 - Stock drift: expose confirmed/estimated/check-needed state and verify only consequential items.
 - Unit ambiguity: reject unsafe cross-unit conversion; ask for clarification.
 - Duplicate completion/concurrency: unique event key, database transaction, and atomic stock update.

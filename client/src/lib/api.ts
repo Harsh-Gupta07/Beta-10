@@ -242,4 +242,10 @@ export type AssistantAction =
   | { id: string; type: 'ADD_STOCK'; ingredientId: string; ingredientName: string; quantity: string; unit: InputUnit; summary: string }
   | { id: string; type: 'ADD_TO_SHOPPING'; items: Array<{ ingredientId: string; ingredientName: string; quantity: string; unit: InputUnit }>; summary: string }
   | { id: string; type: 'RECIPE_DRAFT'; draft: RecipeDraft; summary: string }
-export type AssistantReply = { mode: 'ai' | 'fallback'; reply: string; actions: AssistantAction[] }
+export type AssistantReply = {
+  mode: 'ai' | 'fallback'
+  reply: string
+  actions: AssistantAction[]
+  googleSearch: 'grounded' | 'uncited' | 'not-used' | 'unavailable' | 'not-configured'
+  sources: Array<{ title: string; url: string }>
+}

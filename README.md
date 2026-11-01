@@ -92,11 +92,13 @@ If an old `server/.env` has an empty `GOOGLE_CLIENT_ID=` line, that's fine: the 
 
 ## User guide
 
-The menu (sidebar on desktop, bottom bar and ☰ menu on mobile) has ten sections: **Dashboard, What to Cook, Meal Planner, Recipes, Pantry, Shopping List, Quick Stock Check, Kitchen Assistant, Food Preferences, Household & Settings.**
+The menu (sidebar on desktop, bottom bar and ☰ menu on mobile) has ten sections: **Dashboard, What to Cook, Meal Planner, Recipes, Pantry, Shopping List, Guest Mode, Kitchen Assistant, Food Preferences, Household & Settings.** Stock checks remain accessible from the Dashboard and Pantry.
+
+Use **Guest Mode** when hosting: enter the guest count, select any combination of breakfast, lunch and dinner, and get household recipe ideas ranked by pantry coverage. Results include matching food photos from Wikimedia Commons with source links when available. Open a dish to see ingredient quantities scaled to the guest count and which items are short. Known household allergy or diet conflicts are excluded; unchecked suitability is called out.
 
 ### 1. Create your account and household
 
-1. Open the app and click **Create an account**. Enter your name, email and a password of at least 10 characters.
+1. Open the app and click **Create an account**. Enter your name, email and a password of at least 10 characters. To try the app without an account, choose **See a demo kitchen**; this private sample is deleted after 24 hours.
 2. Choose one:
    - **Create a household**: give it a name (e.g. "Sharma kitchen") and the number of people you usually cook for. You become the **owner**.
    - **Join with a code**: enter the invite code a family member shared from their Settings page. You'll see the same pantry, recipes, plan and shopping list as them.
@@ -251,7 +253,7 @@ Suggestions come from your own data, never from guesses:
 - **What people like**: favourites, dislikes, cuisines and spice limits from Food Preferences.
 - Dishes that clash with anyone's allergy or diet, and drinks, are never suggested.
 
-Switch between **Everyone** and **Just me**, or pick a meal. On each idea: **Plan it** adds it to the planner, **Not today** hides it for everyone for 3 days, **Love it** and **Don't suggest for me** update your own preferences. The AI Assistant uses the same ranking when you ask "What should we cook?".
+Switch between **Everyone** and **Just me**, and choose **Any meal** or any combination of breakfast, lunch and dinner to filter ideas. Matching Wikimedia Commons food photos with source links appear on recipe cards and details when available; recipes without a suitable match use a fallback illustration. On each idea: **Plan it** adds it to the planner, **Not today** hides it for everyone for 3 days, **Love it** and **Don't suggest for me** update your own preferences. The AI Assistant uses the same ranking when you ask "What should we cook?".
 
 ---
 
@@ -297,6 +299,7 @@ Switch between **Everyone** and **Just me**, or pick a meal. On each idea: **Pla
 | API fails to start with a database error | PostgreSQL isn't running, or `DATABASE_URL` in `server/.env` is wrong. Start the PostgreSQL service and check the password. |
 | Errors after `git pull` | Run `npm install`, `npm run db:migrate`, `npm run db:seed`, then `npm run dev`. |
 | No recipes or ingredients | Run `npm run db:seed`. |
+| A food photo shows sample items or can't be analyzed | Use a JPEG, PNG or WebP under 5 MB. Add a valid Gemini key to `AI_API_KEY` in `server/.env`, confirm the key has access to the Generative Language API, and restart `npm run dev`. Photo analysis requires the key; sample scans work without one. |
 | "Meals can only be planned for today or later" | Past dates are locked. Check the household timezone in Settings. |
 | Assistant shows "Offline answer" | No `AI_API_KEY` is set, the key is invalid, or the free usage limit was reached. Wait a minute or check the key. |
 | "Built-in recipes can't be changed" | Use **Make a copy to edit**. |
@@ -310,9 +313,11 @@ Switch between **Everyone** and **Just me**, or pick a meal. On each idea: **Pla
 
 1. Create a key at [Google AI Studio](https://aistudio.google.com) → **Get API key**.
 2. Put it in `server/.env` as `AI_API_KEY=...` and restart the API. **Never commit the key or share it in chats or screenshots.** If it leaks, delete it in AI Studio and create a new one.
-3. **Settings → AI assistant** shows whether it is connected.
+3. **Settings → AI assistant** shows whether a key is configured; a “Google Search grounded” label and source links appear on answers that were actually grounded.
 
-`AI_MODEL` (default `gemini-2.5-flash`) is tried first. If it is overloaded, rate-limited or slow, the whole answer is retried once on `AI_FALLBACK_MODEL` (default `gemini-flash-lite-latest`). If both fail, the assistant answers simple questions from your data in offline mode.
+`AI_MODEL` (default `gemini-2.5-flash`) handles pantry and recipe tools. The assistant then uses the Gemini Interactions API with Google Search grounding (`AI_SEARCH_MODEL`, default `gemini-3.8-flash`) for current or external facts and displays the returned source links. If the main model is unavailable, it retries once with `AI_FALLBACK_MODEL` (default `gemini-flash-lite-latest`); if Google Search grounding is unavailable or returns no citations, the UI labels that clearly. If Gemini itself is unavailable, simple questions can still use offline answers. Each message may make an additional Search-grounded Gemini request.
+
+Food-photo scanning also uses `AI_API_KEY` and `AI_VISION_MODEL` (default `gemini-2.5-flash`). Uploaded photos are analyzed by Gemini; without a key, only the sample scan buttons work. Confirming a grocery scan adds the reviewed items to the shopping list by default, or records them as received in the pantry if selected.
 
 The free tier allows only a few requests per minute, and one question can take 2–3 requests. Only ingredient names, quantities, recipe and meal details and your message are sent to Google; account details are not.
 
@@ -345,6 +350,7 @@ The free tier allows only a few requests per minute, and one question can take 2
 | `AI_API_KEY` | No | Google Gemini key; without it the assistant runs in offline mode |
 | `AI_MODEL` | No | Main Gemini model (default `gemini-2.5-flash`) |
 | `AI_FALLBACK_MODEL` | No | Backup model (default `gemini-flash-lite-latest`) |
+| `AI_SEARCH_MODEL` | No | Gemini model with Google Search grounding (default `gemini-3.8-flash`) |
 | `TEST_DATABASE_URL` | For tests | Separate database for `npm test` |
 | `PORT` | No | API port (default 4000) |
 | `CLIENT_ORIGIN` | No | Allowed browser origin (default `http://localhost:5173`) |
@@ -383,5 +389,11 @@ ARCHITECTURE.md        Data model, full API list, design decisions and risks
 ```
 
 ### Out of scope for Phase 1
+
+### KitchenSync Fit flow
+
+Open **Fit** to create a private fitness profile and use automatic or custom calorie/protein targets. Protein guidance is based on body weight, activity and goal. Planned meals remain separate from consumed nutrition; use **Mark as consumed** in the meal sheet to select each household member and serving amount. Cooking is the only action that deducts pantry stock.
+
+Premium mode previews a seven-day pantry-aware diet plan. AI may only order backend-approved candidates; nutrition, allergy and pantry checks remain deterministic, and the same confirmation flow works with the offline fallback. A preview is not added to the planner until confirmed.
 
 Live grocery integrations (Blinkit, Zepto, Swiggy), barcode scanning, receipt OCR, IoT devices and predictive analytics. Shopping uses a manual hand-off: share the list, then confirm what arrived.

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { isDateString } from '../services/dates.js'
 import * as planner from '../services/planner.js'
+import * as mealLogs from '../services/mealLogs.js'
 
 // Mounted under /households/:householdId, after requireUser + requireHouseholdMember.
 export const plannerRouter = Router({ mergeParams: true })
@@ -34,4 +35,13 @@ plannerRouter.patch('/meals/:mealId', async (req, res) => {
 
 plannerRouter.post('/meals/:mealId/cancel', async (req, res) => {
   res.json(await planner.cancelMeal(householdId(res), mealId(req.params)))
+})
+
+plannerRouter.get('/meals/:mealId/consumption', async (req, res) => {
+  res.json(await mealLogs.plannedMealConsumption(householdId(res), mealId(req.params)))
+})
+
+plannerRouter.post('/meals/:mealId/consume', async (req, res) => {
+  const input = z.object({ portions: z.array(z.object({ userId: z.string().min(1), servings: z.number().positive().max(20) })).min(1).max(50) }).parse(req.body)
+  res.json(await mealLogs.consumePlannedMeal(householdId(res), mealId(req.params), (res.locals.user as { id: string }).id, input.portions))
 })

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRightLeft, BookOpen, ChefHat, CircleX, Repeat } from 'lucide-react'
+import { ArrowRightLeft, BookOpen, ChefHat, CircleX, Repeat, Utensils } from 'lucide-react'
 import { api, errorMessage, type MealSlot, type PlannedMeal, type RecipeSummary } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { formatDay, formatQuantity, slotLabel, slots, statusLabel } from '../../lib/format'
@@ -8,6 +8,7 @@ import { Badge, Modal, Notice } from '../../components/ui'
 import { RecipePicker } from './RecipePicker'
 import { ServingsStepper } from './AddMealDialog'
 import { WhoIsEating } from '../suggestions/WhoIsEating'
+import { RecipePhoto } from '../recipes/RecipePhoto'
 
 type Props = { meal: PlannedMeal; today: string; recipes: RecipeSummary[]; onClose: () => void; onChanged: () => Promise<void>; onCook: () => void }
 
@@ -22,6 +23,7 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
   const [moveSlot, setMoveSlot] = useState<MealSlot>(meal.slot)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [showConsumption, setShowConsumption] = useState(false)
   const path = `/households/${household.id}/meals/${meal.id}`
 
   async function run(request: () => Promise<unknown>) {
@@ -41,6 +43,7 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
           {(meal.status === 'PLANNED' || meal.status === 'COOKING') && <button className="primary-button" onClick={onCook}><ChefHat size={15} aria-hidden />{meal.status === 'COOKING' ? 'Continue cooking' : 'Cook'}</button>}
           {meal.status === 'COMPLETED' && <button className="secondary-button" onClick={onCook}><ChefHat size={15} aria-hidden />See what was used</button>}</>}>
     {error && <Notice>{error}</Notice>}
+    <RecipePhoto name={meal.recipe.name} variant="hero" showSource />
 
     {editable && <div className="sheet-toolbar">
       <ServingsStepper value={servings} onChange={setServings} />
@@ -66,6 +69,10 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
     </section>}
 
     {meal.status !== 'CANCELLED' && <section className="sheet-section"><WhoIsEating kind="meal" id={meal.id} /></section>}
+    {meal.status !== 'CANCELLED' && <section className="sheet-section">
+      <div className="row-between"><div><h3>Personal nutrition</h3><p className="muted small">Cooking changes pantry stock. Consuming updates each person’s private nutrition totals.</p></div><button className="secondary-button" onClick={() => setShowConsumption(value => !value)}><Utensils size={15} />{showConsumption ? 'Close' : 'Mark as consumed'}</button></div>
+      {showConsumption && <ConsumptionPanel householdId={household.id} mealId={meal.id} defaultServings={1} />}
+    </section>}
 
     <section className="sheet-section">
       <h3>Ingredients for {meal.servings} servings</h3>
@@ -89,4 +96,15 @@ export function MealSheet({ meal, today, recipes, onClose, onChanged, onCook }: 
       <p className="muted small">“Reserved” is pantry stock set aside for this meal. Nothing is deducted until the meal is cooked.</p>
     </section>
   </Modal>
+}
+
+function ConsumptionPanel({ householdId, mealId, defaultServings }: { householdId: string; mealId: string; defaultServings: number }) {
+  const [members, setMembers] = useState<Array<{ id: string; name: string }>>([])
+  const [selected, setSelected] = useState<Record<string, number>>({})
+  const [existing, setExisting] = useState<Array<{ user: { id: string; name: string }; servings: string }>>([])
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState('')
+  const load = async () => { const [people, logs] = await Promise.all([api.get(`/households/${householdId}/members`), api.get(`/households/${householdId}/meals/${mealId}/consumption`)]); setMembers(people.data); setExisting(logs.data) }
+  useEffect(() => { void load().catch(err => setMessage(errorMessage(err))) }, [householdId, mealId])
+  async function confirm() { const portions = Object.entries(selected).filter(([, servings]) => servings > 0).map(([userId, servings]) => ({ userId, servings })); if (!portions.length) return setMessage('Choose at least one person.'); setBusy(true); try { await api.post(`/households/${householdId}/meals/${mealId}/consume`, { portions }); setMessage('Nutrition updated. Repeating this confirmation will not count twice.'); await load() } catch (err) { setMessage(errorMessage(err)) } finally { setBusy(false) } }
+  return <div className="consumption-panel">{members.map(member => { const consumed = existing.find(log => log.user.id === member.id); const active = selected[member.id] !== undefined; return <div className="consumption-row" key={member.id}><label><input type="checkbox" checked={active || Boolean(consumed)} disabled={Boolean(consumed)} onChange={event => setSelected(current => { const next = { ...current }; if (event.target.checked) next[member.id] = defaultServings; else delete next[member.id]; return next })} /> <strong>{member.name}</strong></label>{consumed ? <Badge tone="green">Consumed {consumed.servings} serving</Badge> : active && <label>Servings <input type="number" min="0.1" max="20" step="0.1" value={selected[member.id]} onChange={event => setSelected(current => ({ ...current, [member.id]: Number(event.target.value) }))} /></label>}</div>})}{message && <p className="muted small">{message}</p>}<button className="primary-button" disabled={busy} onClick={() => void confirm()}>{busy ? 'Saving…' : 'Confirm portions'}</button></div>
 }

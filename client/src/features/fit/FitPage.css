@@ -1,0 +1,35 @@
+.fit-scan-destination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 12px;
+  border: 1px solid var(--line, #e9e3d6);
+  border-radius: 12px;
+}
+
+.fit-scan-destination legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+
+.fit-scan-destination label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.fit-scan-item {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fit-scan-item .badge {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .fit-scan-destination {
+    display: grid;
+  }
+}

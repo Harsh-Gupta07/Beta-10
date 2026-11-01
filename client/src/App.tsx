@@ -21,6 +21,7 @@ const SuggestionsPage = lazy(() => import('./features/suggestions/SuggestionsPag
 const FoodPreferencesPage = lazy(() => import('./features/preferences/FoodPreferencesPage').then(m => ({ default: m.FoodPreferencesPage })))
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage').then(m => ({ default: m.SettingsPage })))
 const FitPage = lazy(() => import('./features/fit/FitPage').then(m => ({ default: m.FitPage })))
+const GuestModePage = lazy(() => import('./features/guest/GuestModePage').then(m => ({ default: m.GuestModePage })))
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -78,10 +79,12 @@ function App() {
         <Route path="/pantry" element={<PantryPage />} />
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/shopping" element={<ShoppingPage />} />
+        <Route path="/guest-mode" element={<GuestModePage />} />
         <Route path="/assistant" element={<AssistantPage />} />
         <Route path="/suggestions" element={<SuggestionsPage />} />
-        <Route path="/preferences"element={<FoodPreferencesPage />} />
-        <Route path="/settings"element={<SettingsPage onSessionChange={refresh} />} />
+        <Route path="/preferences" element={<FoodPreferencesPage />} />
+        <Route path="/settings" element={<SettingsPage onSessionChange={refresh} />} />
+        <Route path="/profile" element={<Navigate to="/settings" replace />} />
         <Route path="/fit" element={<FitPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -4,10 +4,14 @@ import { AppError } from '../lib/errors.js'
 import { privateImageReference, visionProvider, type ImageInput } from './foodVision.js'
 import { receiveStockTx } from './pantry.js'
 import { recipeNutrition } from './nutrition.js'
+import { addScannedItemsTx } from './shopping.js'
 
 export async function createScan(userId: string, scanType: FoodScanType, image?: ImageInput) {
   const provider = visionProvider(image)
   const proposal = scanType === 'COOKED_MEAL' ? await provider.analyseMeal(image) : await provider.analyseGroceries(image)
+  if (image && proposal.items.length === 0) {
+    throw new AppError(422, proposal.assumptions[0] ?? 'No food items were recognized. Try a brighter, closer photo.', 'FOOD_VISION_NO_ITEMS')
+  }
   const member = await prisma.householdMember.findFirst({ where: { userId }, select: { householdId: true } })
   if (!member) throw new AppError(400, 'Join a household first.')
   const names = proposal.items.map(i => i.name.toLowerCase())
@@ -27,15 +31,28 @@ export async function cancelScan(userId: string, id: string) {
   if (!result.count) throw new AppError(409, 'This scan can no longer be cancelled.')
 }
 
-export async function confirmGrocery(userId: string, id: string, items: Array<{ ingredientId: string; quantity: number }>) {
+export async function confirmGrocery(
+  userId: string,
+  id: string,
+  items: Array<{ ingredientId?: string; name?: string; quantity: number; unit: 'g' | 'ml' | 'count' }>,
+  destination: 'PANTRY' | 'SHOPPING_LIST' = 'PANTRY',
+) {
   return prisma.$transaction(async tx => {
     const locked = await tx.$queryRaw<Array<{ id: string; status: string }>>`SELECT id, status::text FROM "FoodScan" WHERE id=${id} AND "userId"=${userId} FOR UPDATE`
     if (!locked.length) throw new AppError(404, 'Scan not found.')
     if (locked[0]!.status === 'CONFIRMED') return tx.foodScan.findUniqueOrThrow({ where: { id } })
+    if (locked[0]!.status !== 'PROPOSED') throw new AppError(409, 'This grocery scan can no longer be confirmed.')
     const member = await tx.householdMember.findFirstOrThrow({ where: { userId }, select: { householdId: true } })
+    if (destination === 'SHOPPING_LIST') {
+      const added = await addScannedItemsTx(tx, member.householdId, items)
+      return tx.foodScan.update({ where: { id }, data: { status: 'CONFIRMED', confirmedAt: new Date(), idempotencyKey: `scan:${id}`, confirmedResult: { destination, items: added } } })
+    }
     const received = []
-    for (const item of items) received.push(await receiveStockTx(tx, member.householdId, userId, { ingredientId: item.ingredientId, quantity: new Prisma.Decimal(item.quantity), idempotencyKey: `scan:${id}:${item.ingredientId}`, note: 'Confirmed grocery photo' }))
-    return tx.foodScan.update({ where: { id }, data: { status: 'CONFIRMED', confirmedAt: new Date(), idempotencyKey: `scan:${id}`, confirmedResult: { items: received.map(x => ({ ingredientId: x.ingredient.id, quantity: x.quantity, unit: x.unit })) } } })
+    for (const item of items) {
+      if (!item.ingredientId) throw new AppError(400, 'Choose a catalog ingredient for every item before adding it to the pantry.')
+      received.push(await receiveStockTx(tx, member.householdId, userId, { ingredientId: item.ingredientId, quantity: new Prisma.Decimal(item.quantity), idempotencyKey: `scan:${id}:${item.ingredientId}`, note: 'Confirmed grocery photo' }))
+    }
+    return tx.foodScan.update({ where: { id }, data: { status: 'CONFIRMED', confirmedAt: new Date(), idempotencyKey: `scan:${id}`, confirmedResult: { destination, items: received.map(x => ({ ingredientId: x.ingredient.id, quantity: x.quantity, unit: x.unit })) } } })
   })
 }
 
@@ -50,4 +67,3 @@ export async function confirmMeal(userId: string, id: string, input: { recipeId:
     return tx.foodScan.update({ where: { id }, data: { status: 'CONFIRMED', confirmedAt: new Date(), idempotencyKey: `scan:${id}`, confirmedResult: { mealLogId: log.id, recipeId: input.recipeId, servings: input.servings } } })
   })
 }
-

@@ -33,7 +33,7 @@ export function calculateTargets(input: TargetInput) {
   const calories = input.customCalorieTarget ? D(input.customCalorieTarget) : calculatedCalories
   if (calories.lessThan(safeFloor)) throw new AppError(400, `Calorie target must be at least ${safeFloor.toString()} kcal.`)
 
-  const proteinFactor = input.goal === 'MUSCLE_GAIN' ? D('1.6') : input.goal === 'FAT_LOSS' ? D('1.4') : D('1.2')
+  const proteinFactor = input.goal === 'MUSCLE_GAIN' ? D('1.6') : input.goal === 'FAT_LOSS' ? D('1.4') : input.activityLevel === 'SEDENTARY' ? D('0.8') : D('1.2')
   const protein = input.customProteinTargetG != null ? D(input.customProteinTargetG) : weight.mul(proteinFactor)
   const fat = calories.mul('0.25').div(9)
   const carbs = Prisma.Decimal.max(calories.minus(protein.mul(4)).minus(fat.mul(9)).div(4), 0)
@@ -41,7 +41,7 @@ export function calculateTargets(input: TargetInput) {
     bmr: bmr.toDecimalPlaces(0), tdee: tdee.toDecimalPlaces(0), calorieTarget: calories.toDecimalPlaces(0).toNumber(),
     proteinTargetG: protein.toDecimalPlaces(2), carbsTargetG: carbs.toDecimalPlaces(2), fatTargetG: fat.toDecimalPlaces(2),
     calculationVersion: NUTRITION_CALCULATION_VERSION,
-    explanation: 'Mifflin-St Jeor BMR, multiplied by activity level; goal adjustment is 15% below TDEE for fat loss or 10% above for muscle gain. Fat is 25% of calories and remaining energy is assigned to carbohydrates.',
+    explanation: `Mifflin-St Jeor BMR, multiplied by activity level; goal adjustment is 15% below TDEE for fat loss or 10% above for muscle gain. Protein uses body weight, activity and goal (${proteinFactor.toString()} g/kg); general references range from about 0.8 g/kg for sedentary adults to 1.2–1.7 g/kg for active people. Fat is 25% of calories and remaining energy is assigned to carbohydrates.`,
   }
 }
 

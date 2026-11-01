@@ -6,13 +6,12 @@ import { addDays, formatDay, relativeDay, slotLabel, slots } from '../../lib/for
 import { Badge, EmptyState, Field, Notice, PageHeader, Segmented, Spinner } from '../../components/ui'
 import { SuggestionCard, type MyDishPrefs } from './SuggestionCard'
 import { WhoIsEating } from './WhoIsEating'
-
-type SlotChoice = MealSlot | 'ANY'
+import { RecipePhoto } from '../recipes/RecipePhoto'
 
 export function SuggestionsPage() {
   const { household } = useSession()
   const [scope, setScope] = useState<'household' | 'me'>('household')
-  const [slot, setSlot] = useState<SlotChoice>('ANY')
+  const [selectedSlots, setSelectedSlots] = useState<MealSlot[]>([])
   const [data, setData] = useState<SuggestionsData | null>(null)
   const [history, setHistory] = useState<HistoryData | null>(null)
   const [prefs, setPrefs] = useState<MyDishPrefs | undefined>()
@@ -22,15 +21,31 @@ export function SuggestionsPage() {
   const load = useCallback(async () => {
     setError('')
     try {
-      const [s, h, p] = await Promise.all([
-        api.get<SuggestionsData>(`/households/${household.id}/suggestions`, { params: { scope, limit: 12, ...(slot === 'ANY' ? {} : { slot }) } }),
+      const [suggestionResponses, h, p] = await Promise.all([
+        Promise.all((selectedSlots.length ? selectedSlots : [null]).map(slot =>
+          api.get<SuggestionsData>(`/households/${household.id}/suggestions`, { params: { scope, limit: 12, ...(slot ? { slot } : {}) } }),
+        )),
         api.get<HistoryData>(`/households/${household.id}/history`, { params: { days: 30, scope } }),
         api.get<FoodPreferences>('/me/food-preferences'),
       ])
-      setData(s.data); setHistory(h.data)
+      const base = suggestionResponses[0].data
+      const uniqueSuggestions = new Map<string, SuggestionsData['suggestions'][number]>()
+      for (const response of suggestionResponses) {
+        for (const suggestion of response.data.suggestions) {
+          const current = uniqueSuggestions.get(suggestion.recipe.id)
+          if (!current || suggestion.score > current.score) uniqueSuggestions.set(suggestion.recipe.id, suggestion)
+        }
+      }
+      setData({
+        ...base,
+        slot: selectedSlots.length === 1 ? selectedSlots[0] : null,
+        suggestions: [...uniqueSuggestions.values()].sort((a, b) => b.score - a.score).slice(0, 12),
+        excludedForSafety: Math.max(...suggestionResponses.map(response => response.data.excludedForSafety)),
+      })
+      setHistory(h.data)
       setPrefs({ favourite: new Set(p.data.favouriteRecipes.map(r => r.id)), disliked: new Set(p.data.dislikedRecipes.map(r => r.id)) })
     } catch (err) { setError(errorMessage(err, 'Suggestions could not be loaded.')) }
-  }, [household.id, scope, slot])
+  }, [household.id, scope, selectedSlots])
   useEffect(() => { void load() }, [load])
 
   // Refresh first, so the confirmation never appears next to a stale list.
@@ -43,7 +58,13 @@ export function SuggestionsPage() {
 
     <section className="toolbar">
       <Segmented label="Cooking for" value={scope} onChange={setScope} options={[{ value: 'household', label: 'Everyone' }, { value: 'me', label: 'Just me' }]} />
-      <Segmented label="Meal" value={slot} onChange={setSlot} options={[{ value: 'ANY', label: 'Any meal' }, ...slots.map(s => ({ value: s, label: slotLabel[s] }))]} />
+      <fieldset className="meal-filter">
+        <legend>Meal ideas</legend>
+        <label><input type="checkbox" checked={selectedSlots.length === 0} onChange={() => setSelectedSlots([])} />Any meal</label>
+        {slots.map(slot => <label key={slot}><input type="checkbox" checked={selectedSlots.includes(slot)} onChange={() => setSelectedSlots(current =>
+          current.includes(slot) ? current.filter(value => value !== slot) : slots.filter(value => value === slot || current.includes(value)),
+        )} />{slotLabel[slot]}</label>)}
+      </fieldset>
     </section>
 
     {!data && !error && <Spinner label="Finding ideas…" />}
@@ -54,7 +75,7 @@ export function SuggestionsPage() {
           ? <section className="panel"><EmptyState icon={UtensilsCrossed} title="No suggestions right now">
               {data.excludedForSafety ? 'Every dish clashes with someone’s allergies or diet, or is hidden for now. Add recipes that suit everyone, or check Food Preferences.' : 'Add some recipes to get ideas.'}
             </EmptyState></section>
-          : data.suggestions.map(s => <SuggestionCard key={s.recipe.id} suggestion={s} prefs={prefs} today={data.today} defaultSlot={data.slot} onChanged={changed} />)}
+          : data.suggestions.map(s => <SuggestionCard key={s.recipe.id} suggestion={s} prefs={prefs} today={data.today} defaultSlot={data.slot ?? selectedSlots[0]} onChanged={changed} />)}
         <p className="muted small">
           {data.excludedForSafety > 0 && `${data.excludedForSafety} dish${data.excludedForSafety === 1 ? ' was' : 'es were'} left out because ${data.excludedForSafety === 1 ? 'it clashes' : 'they clash'} with someone’s allergies or diet. `}
           “Ready” uses only stock that isn’t already reserved for planned meals.
@@ -81,14 +102,14 @@ function RecentlyEaten({ history, today, onChanged }: { history: HistoryData; to
       {history.dishes.length === 0
         ? <p className="muted small">Nothing yet. Meals count once they’re marked as cooked in the planner, or logged here.</p>
         : <ul className="plain-list">{history.dishes.slice(0, 8).map(d => <li key={d.recipe.id}>
-            <span>{d.recipe.name}</span>
+            <span className="compact-recipe"><RecipePhoto name={d.recipe.name} variant="thumb" />{d.recipe.name}</span>
             <span className="muted small">{d.times}× · {d.daysAgo === 0 ? 'today' : d.daysAgo === 1 ? 'yesterday' : `${d.daysAgo} days ago`}</span>
           </li>)}</ul>}
       {history.meals.length > 0 && <>
         <h3 className="subhead">Meals</h3>
         <ul className="eaten-list">{history.meals.slice(0, 12).map(meal => <li key={meal.id}>
           <button className="history-row" onClick={() => setOpen(open === meal.id ? null : meal.id)} aria-expanded={open === meal.id}>
-            <span><strong>{meal.recipe.name}</strong><small>{relativeDay(meal.date, today)} · {slotLabel[meal.slot]}</small></span>
+            <span className="history-recipe"><RecipePhoto name={meal.recipe.name} variant="thumb" /><span><strong>{meal.recipe.name}</strong><small>{relativeDay(meal.date, today)} · {slotLabel[meal.slot]}</small></span></span>
             <span className="badge-row">{meal.source === 'LOGGED' && <Badge tone="grey">Logged</Badge>}<Badge tone="blue"><Users size={11} aria-hidden className="inline-icon" /> {meal.eaters.length}</Badge></span>
           </button>
           {open === meal.id && <div className="history-detail">

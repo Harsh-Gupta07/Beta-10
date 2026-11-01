@@ -16,6 +16,7 @@ import { nutritionRouter } from './routes/nutrition.js'
 import { mealLogsRouter } from './routes/mealLogs.js'
 import { nutritionRecommendationsRouter } from './routes/nutritionRecommendations.js'
 import { scansRouter } from './routes/scans.js'
+import { dietPlansRouter } from './routes/dietPlans.js'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
@@ -75,6 +76,11 @@ export function createApp() {
     res.status(403).json({ error: 'Request origin not allowed.' })
   })
 
+  // Scans carry a base64-encoded image; keep the larger limit scoped to photo proposals.
+  app.use('/api/v1/scans', (req, res, next) => {
+    if (req.method === 'POST' && req.path === '/') return express.json({ limit: '8mb' })(req, res, next)
+    next()
+  })
   app.use(express.json({ limit: '1mb' }))
   app.use(session({
     name: 'kitchensync.sid',
@@ -99,6 +105,7 @@ export function createApp() {
   app.use('/api/v1/meal-logs', mealLogsRouter)
   app.use('/api/v1/recommendations/nutrition', nutritionRecommendationsRouter)
   app.use('/api/v1/scans', scansRouter)
+  app.use('/api/v1/diet-plans', dietPlansRouter)
 
   if (env.SERVE_CLIENT) {
     const dist = path.resolve(process.cwd(), env.CLIENT_DIST_DIR)
