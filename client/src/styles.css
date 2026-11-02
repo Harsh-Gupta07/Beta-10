@@ -45,7 +45,9 @@ h1, h2, h3 { font-family: Newsreader, Georgia, serif; color: var(--ink); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .brand { display: flex; align-items: center; gap: 10px; font: 700 25px Newsreader, Georgia, serif; letter-spacing: -.6px; color: var(--ink); }
-.brand-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: var(--green); color: #fffaf1; }
+.brand-icon { display: grid; place-items: center; width: 38px; height: 38px; flex: none; filter: drop-shadow(0 3px 5px #0d452c24); }
+.brand-icon img { display: block; width: 100%; height: 100%; }
+.brand:hover .brand-icon { transform: translateY(-1px); }
 .brand-light { font-weight: 600; color: var(--green); }
 
 .eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: 1.3px; color: #67806f; margin: 0 0 8px; text-transform: uppercase; }

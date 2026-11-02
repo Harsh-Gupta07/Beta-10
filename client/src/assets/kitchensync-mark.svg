@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="kitchenSyncGreen" x1="8" y1="5" x2="57" y2="61" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#25734D"/>
+      <stop offset="1" stop-color="#0D452C"/>
+    </linearGradient>
+    <linearGradient id="kitchenSyncWarm" x1="32" y1="14" x2="32" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF9ED"/>
+      <stop offset="1" stop-color="#EAF2E5"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="19" fill="url(#kitchenSyncGreen)"/>
+  <path d="M18.5 34.5C18.5 42.9 24.5 48 32 48s13.5-5.1 13.5-13.5h-27Z" fill="url(#kitchenSyncWarm)"/>
+  <path d="M17 33.5h30" stroke="#FFF9ED" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M32 30.5V17.5M27.5 18v7M36.5 18v7M32 17.5c0-1.7 1.3-3 3-3M32 17.5c0-1.7-1.3-3-3-3" stroke="#FFF9ED" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21.5 42.5c2.6 2.2 6.1 3.5 10.5 3.5s7.9-1.3 10.5-3.5" stroke="#B7D8B5" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, BookOpen, CalendarDays, ClipboardCheck, Dumbbell, Heart, House, LayoutDashboard, Lightbulb, LogOut, Menu, Refrigerator, Settings, ShoppingCart, Sparkles, Sprout, X, type LucideIcon } from 'lucide-react'
+import { Bell, BookOpen, CalendarDays, ClipboardCheck, Dumbbell, Heart, House, LayoutDashboard, Lightbulb, LogOut, Menu, Refrigerator, Settings, ShoppingCart, Sparkles, X, type LucideIcon } from 'lucide-react'
+import kitchenSyncMark from '../assets/kitchensync-mark.svg'
 import { api, type AppNotification } from '../lib/api'
 import { useSession } from '../lib/session'
 import { relativeTime } from '../lib/format'
@@ -34,7 +35,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function Brand() {
-  return <Link className="brand" to="/"><span className="brand-icon"><Sprout size={20} strokeWidth={2.2} aria-hidden /></span><span>Kitchen<span className="brand-light">Sync</span></span></Link>
+  return <Link className="brand" to="/"><span className="brand-icon"><img src={kitchenSyncMark} alt="" aria-hidden="true" /></span><span>Kitchen<span className="brand-light">Sync</span></span></Link>
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
